@@ -7,6 +7,9 @@ function results = demoGnssPositioning(varargin)
 %     图3: 每星 C/N0 随时间（跟踪质量）
 %     图4: 伪距重建 vs 注入真值（一致性）
 %     图5: 定位结果（经纬高 + 距参考点误差 + GDOP + 残差）
+%     图6: 解码原始电文（300 位位梯 + 逐字/字段解析）
+%   控制台额外直接输出解码后的原始电文数据（300 位比特 + TLM/HOW +
+%   数据字 + 星历 26 字段），参数 'MsgPRN' 选星（默认第一颗）
 %
 %   用法:
 %     demoGnssPositioning                    % 6 星，28 s，~1.5 min
@@ -17,7 +20,7 @@ function results = demoGnssPositioning(varargin)
 %     - 合成信号模式下星历从接收信号解码（端到端）；如需硬件 TX→RX，
 %       传 'Synthetic', false（Pluto 发射需确认，且仅子帧 1 → 用已知星历）
 %     - 图默认保存到 data/demo_gnss_positioning_<时间戳>.png（第 1-5 图
-%       各一张 + 一张总览）
+%       各一张 + 一张总览 + 一张电文图）
 
 p = struct();
 p.Synthetic = true;
@@ -26,6 +29,7 @@ p.RefLat    = 31.2304;
 p.RefLon    = 121.4737;
 p.RefH      = 0;
 p.CaptureSec = 28;
+p.MsgPRN     = [];
 for k = 1:2:numel(varargin)
     key = varargin{k};
     val = varargin{k+1};
@@ -36,6 +40,7 @@ for k = 1:2:numel(varargin)
         case 'reflon',     p.RefLon = val;
         case 'refh',       p.RefH = val;
         case 'capturesec', p.CaptureSec = val;
+        case 'msgprn',     p.MsgPRN = val;
         otherwise, error('未知参数: %s', key);
     end
 end
@@ -61,11 +66,52 @@ end
 
 %% ---- 准备绘图数据 ----
 prns   = results.injected.prns;
+if isempty(p.MsgPRN)
+    p.MsgPRN = prns(1);
+end
 X0     = results.injected.X0;
 satPos = results.injected.satPos;
 posEst = results.posEst;
 m      = results.metrics;
 trk    = results.trk;
+
+% 每星重新解码子帧 + 星历（供电文展示）
+decAll = cell(1, p.NumSats);
+ephAll = cell(1, p.NumSats);
+for i = 1:p.NumSats
+    decAll{i} = gnssSubframeDecode(trk(i).bits);
+    ephAll{i} = gnssEphDecode(decAll{i}.subframes);
+end
+results.decAll = decAll;
+results.ephAll = ephAll;
+
+%% ---- 控制台：解码原始电文数据 ----
+msgIdx = find(prns == p.MsgPRN, 1);
+if isempty(msgIdx)
+    msgIdx = 1;
+    p.MsgPRN = prns(1);
+end
+fprintf('\n==========================================================\n');
+sf1i = find([decAll{msgIdx}.subframes.subframeId] == 1, 1);
+if isempty(sf1i), sf1i = 1; end
+fprintf(' 解码原始电文数据：PRN %d（子帧 %d，TOW %d）\n', ...
+    p.MsgPRN, decAll{msgIdx}.subframes(sf1i).subframeId, ...
+    decAll{msgIdx}.subframes(sf1i).tow);
+fprintf('==========================================================\n');
+printNavMessage(trk(msgIdx), decAll{msgIdx}, ephAll{msgIdx});
+for i = 1:p.NumSats
+    if i == msgIdx, continue; end
+    i1 = find([decAll{i}.subframes.subframeId] == 1, 1);
+    if isempty(i1), i1 = 1; end
+    sf1 = decAll{i}.subframes(i1);
+    if isfield(trk(i), 'numErrors')
+        fprintf('  PRN %2d: 子帧1 TOW=%d 子帧号=%d 位误码(参考)=%d\n', ...
+            prns(i), sf1.tow, sf1.subframeId, trk(i).numErrors);
+    else
+        fprintf('  PRN %2d: 子帧1 TOW=%d 子帧号=%d（解调 %d 位）\n', ...
+            prns(i), sf1.tow, sf1.subframeId, numel(trk(i).bits));
+    end
+end
 
 % 每星方位/仰角（以参考点 X0 为观测站）
 [azDeg, elDeg] = deal(zeros(1, p.NumSats));
@@ -167,6 +213,16 @@ title('指标');
 grid on;
 saveas(f5, [pngBase '_5_position.png']);
 
+%% ---- 图6：解码原始电文（位梯 + 字段）----
+f6 = figure('Name', '解码原始电文', 'Position', [360 360 980 640]);
+sf  = decAll{msgIdx}.subframes(sf1i);
+sidx = decAll{msgIdx}.syncIndex(1);
+subframeBits = trk(msgIdx).bits(sidx : sidx + 299);   % 极性已消除
+drawBitLadder(subframeBits);
+title(sprintf('PRN %d 原始电文子帧 1（300 位，TOW %d）', ...
+    p.MsgPRN, sf.tow));
+saveas(f6, [pngBase '_6_navmsg.png']);
+
 %% ---- 总览图（2x3 拼图）----
 fo = figure('Name', '多星定位演示总览', 'Position', [80 80 1280 760]);
 subplot(2, 3, 1);
@@ -205,6 +261,85 @@ fprintf('[演示] 图已保存: %s_*.png（5 幅 + 总览）\n', pngBase);
 fprintf('  定位结果: %.6f°N %.6f°E %.1f m，误差 %.1f m，GDOP %.2f\n', ...
     m.lat, m.lon, m.h, m.dPos, m.gdop);
 results.demoPng = pngBase;
+end
+
+%% ---- 工具：控制台打印解码电文 ----
+function printNavMessage(t1, dec, eph)
+sf1idx = find([dec.subframes.subframeId] == 1, 1);
+if isempty(sf1idx), sf1idx = 1; end
+sf  = dec.subframes(sf1idx);
+sidx = dec.syncIndex(sf1idx);
+bits300 = t1.bits(sidx : sidx + 299);
+words = reshape(bits300, 30, 10).';
+
+% 还原逻辑数据（D30 位反转）
+logW = zeros(10, 24);
+prevD30 = 0;
+for w = 1:10
+    logW(w, :) = mod(words(w, 1:24) + prevD30, 2);
+    prevD30 = words(w, 30);
+end
+
+fprintf('原始 300 位（每 30 位一个字，共 10 字）:\n');
+for w = 1:10
+    b = words(w, :);
+    fprintf('  W%02d  %s %s %s\n', w, ...
+        binStr(b(1:10)), binStr(b(11:20)), binStr(b(21:30)));
+end
+
+fprintf('\n逐字解析（逻辑数据，24 位）:\n');
+fprintf('  W1 TLM : 前导码=%s 消息(9:14)=%s 保留=%s 计数(17:22)=%s 完好性=%d 备用=%d\n', ...
+    binStr(logW(1,1:8)), binStr(logW(1,9:14)), binStr(logW(1,15:16)), ...
+    binStr(logW(1,17:22)), logW(1,23), logW(1,24));
+fprintf('  W2 HOW : TOW=%d 子帧号=%d Alert=%d AS=%d\n', ...
+    bi2de(logW(2,1:17), 'left-msb'), bi2de(logW(2,20:22), 'left-msb'), ...
+    logW(2,18), logW(2,19));
+for w = 3:10
+    fprintf('  W%02d 数据: %s %s %s\n', w, ...
+        binStr(logW(w,1:8)), binStr(logW(w,9:16)), binStr(logW(w,17:24)));
+end
+
+fprintf('\n星历解析（26 字段）:\n');
+names = {'Af0(s)','Af1(s/s)','Af2(s/s^2)','Toc(s)','Week','IODE','IODC', ...
+    'TGD(s)','URA','SVHealth','sqrtA(m^.5)','Ecc','M0(半周)','DeltaN(半周/s)', ...
+    'Toe(s)','Cuc','Cus','Cic','Cis','Crc','Crs','Omega0(半周)','omega(半周)', ...
+    'i0(半周)','OmegaDot(半周/s)','IDOT(半周/s)'};
+vals = {eph.Af0, eph.Af1, eph.Af2, eph.Toc, eph.Week, eph.IODE, eph.IODC, ...
+    eph.TGD, eph.URA, eph.SVHealth, eph.SqrtA, eph.Ecc, eph.M0, eph.DeltaN, ...
+    eph.Toe, eph.Cuc, eph.Cus, eph.Cic, eph.Cis, eph.Crc, eph.Crs, ...
+    eph.Omega0, eph.omega, eph.i0, eph.OmegaDot, eph.IDOT};
+for k = 1:numel(names)
+    fprintf('  %-16s = %-14.6g\n', names{k}, vals{k});
+end
+end
+
+%% ---- 工具：位串 ----
+function s = binStr(b)
+s = sprintf('%d', b);
+end
+
+%% ---- 工具：原始电文位梯图 ----
+function drawBitLadder(bits300)
+% 10 字 x 30 位列梯：1 为深色，0 为浅色，字边界标线
+gridBits = reshape(bits300, 30, 10).';   % 10x30
+imagesc(1:30, 1:10, gridBits);
+colormap([0.88 0.88 0.88; 0.15 0.35 0.75]);
+set(gca, 'YDir', 'reverse');
+xlabel('字内位序号'); ylabel('电文字序号');
+for w = 1:10
+    text(30.8, w, sprintf('W%02d', w), 'FontSize', 8, 'HorizontalAlignment', 'left');
+end
+hold on;
+for x = 8.5:3:29.5
+    plot([x x], [0.5 10.5], 'k:', 'LineWidth', 0.4);
+end
+for x = 0.5:10.5
+    plot([x x], [0.5 10.5], 'k-', 'LineWidth', 0.3);
+end
+text(4.5, 10.6, 'TLM 前导码', 'FontSize', 7, 'HorizontalAlignment', 'center');
+text(14.5, 10.6, 'HOW (TOW/子帧号)', 'FontSize', 7, 'HorizontalAlignment', 'center');
+axis([0 33 0.5 11.4]);
+colorbar('Ticks', [0 1], 'TickLabels', {'0', '1'});
 end
 
 %% ---- 工具：ECEF → 方位/仰角 ----
