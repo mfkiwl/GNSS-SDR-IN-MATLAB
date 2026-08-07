@@ -1,0 +1,20 @@
+# ---------- MATLAB ----------
+*.asv
+*.m~
+*.mex*
+slprj/
+*.slxc
+*.mlappinstall
+*.mlpkginstall
+codegen/
+mlx/
+
+# ---------- 采集与验证输出（大文件不入库） ----------
+matlab/frontend/data/*
+data/*
+!data/.gitkeep
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
