@@ -100,6 +100,32 @@
 - 星历外推超出拟合区间（2 h）会产生伪近星（PRN13/32 实测 663 km），
   星座校验须在每星自身 Toe 处计算
 
+## [0.11.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/generateMultiSatTxBuffer.m`：多星叠加 TX 缓冲
+  （每星独立码延迟/幅度/多普勒，circshift 延迟即周期流码相位）
+- `matlab/acquisition/gnssPseudorange.m`：跟踪 + 解码子帧 → 伪距
+  （亚毫秒比特边界解析：能量曲线抛物线插值 + 码相位零点锚定）
+- `matlab/acquisition/leastSquaresPosition.m`：伪距最小二乘定位
+  （4 未知数高斯-牛顿迭代，含 GDOP）
+- `matlab/acquisition/verifyGnssPositioning.m`：M4.2 定位验证
+  （注入真实星座几何伪距，参考点上海）
+- `docs/M4_positioning.md`：验证报告
+
+### Key Findings (M4.2 多星定位)
+
+- **PASS（6 星合成闭环）**：全链路（TX→捕获→跟踪→星历→伪距→LS）
+  解算位置距参考点 **217.9 m**（门限 300 m），伪距重建 vs 注入真值
+  **6.5 m**，GDOP 7.7，残差 RMS 38.5 m
+- **±1 ms 伪距歧义**：整数 ms 比特同步锚定子帧产生每星 ±300 km 误差；
+  能量曲线抛物线插值得亚毫秒比特相位，配合码相位零点
+  （e_sf = floor(P)·msLen + codePhase）消除
+- **统一锚定子帧 1**：不同子帧起点差 6-12 s（卫星位移 ~50 km）会造成
+  几何不一致；28 s 采集保证任意对齐含完整子帧 1
+- 多星 18 s 重复周期歧义为公共时标误差，被最小二乘钟差吸收
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
