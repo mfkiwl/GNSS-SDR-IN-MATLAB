@@ -3,6 +3,23 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-08-07
+
+### Added
+
+- 天线传输验证：拉杆天线 TX → 有源天线 RX（无 bias-T，无源接收）闭环 **PASS**
+
+### Changed
+
+- `verifyGnssLoopback` 默认功率改为拉杆天线实测推荐值（TX -65 dB）
+- README、docs/M2_acquisition.md：补充天线验证结果与功率建议
+
+### Key Findings (天线验证)
+
+- 天线路径损耗约 -44 dB（相对回环线），TX -65 dB 即回到真实 GPS 信号量级
+- 无 bias-T 时有源天线以无源状态接收仍可稳定捕获（链路余量足够）
+- 拉杆天线 1/4 波长（≈5 cm）起步即可，长度不敏感
+
 ## [0.3.0] - 2026-08-07
 
 ### Added

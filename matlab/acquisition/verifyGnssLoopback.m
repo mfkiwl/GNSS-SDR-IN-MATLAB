@@ -4,7 +4,8 @@ function results = verifyGnssLoopback(varargin)
 %   用法：
 %     verifyGnssLoopback                          % 默认参数
 %     verifyGnssLoopback('PRN', 8, 'CaptureSec', 2)
-%     verifyGnssLoopback('TxGain', -20, 'RxGain', 10)  % 天线场景调功率
+%     verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034, 'RxGain', 10)  % 回环线
+%     verifyGnssLoopback('TxGain', -65)                % 拉杆天线发射（实测推荐）
 %
 %   流程：
 %     1. TX 用 transmitRepeat 发射合成 C/A 码（低功率起步，相位连续）
@@ -21,9 +22,9 @@ p = struct();
 p.PRN         = 5;
 p.Fs          = 2.5e6;
 p.CenterFreq  = 1575.42e6;
-p.TxGain      = -30;        % Pluto TX Gain: 0=最大输出，负值=衰减（回环安全起步）
+p.TxGain      = -65;        % Pluto TX Gain: 0=最大输出，负值=衰减（拉杆天线实测推荐）
 p.TxAmplitude = 0.1;
-p.RxGain      = 10;
+p.RxGain      = 20;
 p.CaptureSec  = 2;
 p.IntegrationMs = 5;
 p.NonCoherentN  = 10;
