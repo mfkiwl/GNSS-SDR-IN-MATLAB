@@ -15,6 +15,7 @@
 - `matlab/commlab/`：辅助模块，通信原理实验平台（AM/FM/ASK/QAM/FSK/TDM/FDM
   调制解调交互演示）
 - `docs/M1_streaming_verification.md`：M1 验证方案与结论（PASS）
+- `docs/HANDOFF.md`：项目交接文档（环境/硬件/代码资产/技术结论/下一步计划）
 
 ### Key Findings (M1)
 
