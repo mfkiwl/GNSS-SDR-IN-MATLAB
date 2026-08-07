@@ -1,10 +1,10 @@
 # GNSS-SDR-IN-MATLAB 项目交接文档
 
-> **交接日期**：2026-08-07（第二次交接，覆盖 M2 捕获、TX 发射、50 bps 电文、
-> 连续子帧同步全部硬件验证成果）
+> **交接日期**：2026-08-07（第三次交接，新增 M3 DLL/PLL 跟踪模块全部
+> Synthetic + 硬件闭环验证成果）
 > **编写方**：Codex 会话（工作目录 `C:\Users\chang.su\Documents\Codex in Matlab`）
 > **目的**：为下一个 Codex 会话提供完整、准确、经过实测验证的项目上下文，
-> 使其无需从零探索即可继续开发 M3/M4
+> 使其无需从零探索即可继续开发 M4
 
 ---
 
@@ -20,8 +20,8 @@
 | M1 | PlutoSDR 连续采集链路验证（4 MSPS、无丢帧） | ✅ PASS（2026-08-06） |
 | M2 | 捕获模块：32 PRN FFT 并行码相位搜索 | ✅ PASS（离线 6/6 + 硬件链路，2026-08-07） |
 | M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
-| M3 | 跟踪模块：DLL/PLL 多通道实时跟踪 | ⬜ 待开发（下一步） |
-| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 规划中 |
+| M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS（2026-08-07，详见 §5.7） |
+| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 待开发（下一步） |
 
 > 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
 > （bias-T 尚未到货）。当前所有硬件验证均通过 **TX 发射合成 GPS 信号**完成，
@@ -149,7 +149,7 @@ node "C:\Users\chang.su\.codex\skills\deepseek-vision-skill\scripts\describe-ima
 **同步规则**：工作区与 `D:\13_MCP\GNSS` 内容一致（`Copy-Item` 双向同步 + SHA256 校验）；
 Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进展 commit + push。
 
-### 4.2 工作区文件清单（18 个，均为 UTF-8 无 BOM）
+### 4.2 工作区文件清单（20 个，均为 UTF-8 无 BOM）
 
 | 文件 | 功能 |
 |---|---|
@@ -169,6 +169,8 @@ Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进
 | `gnssBitEdgeDetect.m` | 比特边缘检测（能量法 + 翻转直方图法） |
 | `gnssSubframeDecode.m` | 子帧同步（前导码 + 奇偶校验 + BPSK 极性消除）+ 字段解码 + 对比 |
 | `verifyGnssContinuousNav.m` | 连续子帧收发验证（Synthetic/硬件两模式） |
+| `tracking.m` | **M3 跟踪主函数**：DLL+PLL 多通道跟踪、C/N0、位同步、锁定判定 |
+| `verifyGnssTracking.m` | M3 验证脚本（Synthetic/硬件闭环双模式，端到端子帧对比） |
 | `README_GNSS.md` | 项目 README（含各验证模块用法） |
 | `README_M1.md` | M1 验证方案文档 |
 
@@ -187,6 +189,7 @@ GNSS-SDR-IN-MATLAB/
 ├── matlab/
 │   ├── frontend/                     # gnssSettings/plutoGnssFrontEnd/verifyPlutoStream
 │   ├── acquisition/                  # 捕获 + TX + 电文 + 子帧全部模块
+│   ├── tracking/                     # M3 DLL/PLL 跟踪（tracking/verifyGnssTracking）
 │   └── commlab/                      # 辅助模块（通信原理实验平台）
 ├── CHANGELOG.md（0.1.0 ~ 0.6.0）
 ├── README.md / LICENSE / .gitignore
@@ -239,7 +242,7 @@ GNSS-SDR-IN-MATLAB/
 - 捕获 PRN5（metric 15.8，多普勒 0 Hz）；解调 **100 位 0 比特错误**（匹配率 1.000）
 - 产物：`data\gnss_navdata_20260807_162158.mat/.png`
 
-### 5.6 连续 GPS 子帧收发验证（最新，模拟真实环境）
+### 5.6 连续 GPS 子帧收发验证（模拟真实环境）
 
 - 发射 1 个完整子帧（300 位 = 6 s：TLM 前导码 + HOW(TOW=80000) + 8 数据字，
   含 ICD-GPS-200 奇偶校验）持续重复；`step()` 连续流采集 12 s
@@ -249,6 +252,17 @@ GNSS-SDR-IN-MATLAB/
 - 解码：TOW=80000、子帧号=1、TLM=010101；**300 位 0 比特错误**（逐位一致）
 - 产物：`data\gnss_continuous_20260807_164313.mat`（`results.txBits/bits/dec` 完整保留）
 - 报告：`docs/ContinuousNav_verification.md`（含实验图）
+
+### 5.7 M3 跟踪模块验证（DLL + PLL，2026-08-07）
+
+- **Synthetic PASS**：8 s 合成信号注入 +1200 Hz 多普勒/码相位 777/C/N0=45；
+  捕获 metric 134；跟踪锁定 CN0 43.2 dB-Hz（真值 45）、频率误差 0.03 Hz、
+  码相位误差 0.01 采样；610 位 **0 误码**；子帧解码 1/1（TOW=80000）
+- **硬件闭环 PASS**（TX −65 dB / RX 20 dB 天线场景，12.5 s `step()` 流）：
+  捕获 PRN5 metric 18.2、领先度 5.1×；锁定 CN0 35.9 dB-Hz、码相位 std
+  0.020 采样、频率误差 0.11 Hz；609 位 **0 误码**；子帧解码 1/1
+- 产物：`data\gnss_tracking_20260807_173214.mat`（硬件）/ `_173105.mat`（Synthetic）
+- 报告：`docs/M3_tracking.md`（含实验图）；代码在 `matlab/tracking/`
 
 ---
 
@@ -310,6 +324,22 @@ GNSS-SDR-IN-MATLAB/
 19. GPS 电文字结构：30 位/字 × 10 字 = 300 位/子帧 = 6 s；TLM 前导码
     `10001011`；奇偶校验含前字 D29/D30 反馈（子帧首字前值为 0）。
 
+### 6.5 M3 跟踪（2026-08-07 新增）
+
+20. **二阶环路滤波器必须用位置式 PI**（`f = f0 + Kp*e + Ki*sum(e)`）：
+    增量式 `f += Kp*e + ...` 会把比例项也积分成双积分器，噪声下频率随机
+    游走、频偏下极限环（实测发散到 −55 kHz）；位置式从 40 Hz 离格频偏
+    ~1 s 内可靠牵入。
+21. **Costas 鉴别器模 π**（atan(Q_P/I_P)）：牵入范围仅环路带宽量级；初值
+    必须来自捕获（DopplerStep=100 → 误差 ≤50 Hz，位置式环路可牵入），
+    高动态场景后续应加 FLL 辅助。
+22. **C/N0 的 20 ms 窗口必须按位同步对齐**：跨比特翻转时窄带功率被抵消，
+    C/N0 低估 ~25 dB（实测 35.9 → 11.2 dB-Hz，比特仍 0 误码）；先位同步，
+    再按 `(bitOffset + skipMs) mod 20` 对齐窗口计算。
+23. **端到端子帧解码需 ≥ 600 位跟踪比特**（12 s 采集）：385 位时子帧起点
+    落在 286 位即窗口截断；参考匹配须测双极性（BPSK 180° 模糊下 `bits==ref`
+    仅 ~63%，`bits==1-ref` 后 100%）。
+
 ---
 
 ## 7. 复现与验证步骤
@@ -320,6 +350,7 @@ GNSS-SDR-IN-MATLAB/
 cd('D:\13_MCP\GNSS')
 runAcquisitionTests                          % M2 捕获 6/6
 verifyGnssContinuousNav('Synthetic', true)   % 连续子帧离线模拟
+verifyGnssTracking('Synthetic', true)        % M3 跟踪离线（8 s 合成）
 ```
 
 ### 7.2 硬件验证（需相应接线）
@@ -330,6 +361,7 @@ verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034, 'RxGain', 10)  % 回�
 verifyGnssLoopback                           % 天线场景（默认 TX -65）
 verifyGnssNavData                            % 50 bps 电文（天线场景）
 verifyGnssContinuousNav                      % 连续子帧（天线场景，12 s）
+verifyGnssTracking                           % M3 跟踪（天线场景，12.5 s）
 ```
 
 PowerShell 自动化（无需打开桌面）：
@@ -359,20 +391,17 @@ PowerShell 自动化（无需打开桌面）：
 
 ---
 
-## 9. 下一步计划（M3 优先）
+## 9. 下一步计划（M4 优先）
 
 ### M3：跟踪模块（DLL + PLL）
 
-- **输入初值**：`acquisition.m` 输出的 `codePhase`（采样点）与 `dopplerHz`
-- **架构**：`step()` 连续流 + 双缓冲（后台采集线程持续 step，主线程处理），
-  10 ms 帧批处理；每通道 DLL（码环）+ PLL（载波环），1–10 ms 相干积分，输出 C/N0
-- **可复用资产**：`demodulateNavBits` 的逐 ms 剥码逻辑、`gnssBitEdgeDetect`
-  翻转法、`generateGnssTxBuffer`（闭环测试发射源）
-- **验证**：先用现有 TX 发射链路（回环/天线）做闭环测试；验收标准：
-  C/N0 稳定、环路锁定、位同步成功（已有翻转法基线）
-- 参考：SoftGNSS `tracking.m`（perrysou/GNSS_SDR）；MathWorks 官方 Pluto 捕获/跟踪示例
+- **已完成**（2026-08-07，详见 §5.7 / docs/M3_tracking.md）：
+  `tracking.m` 实现 DLL+PLL 多通道跟踪 + 位同步 + C/N0 + 锁定判定，
+  Synthetic 与硬件闭环双模式 PASS（0 比特误码、子帧解码全对）
+- **剩余**：`step()` 分块在线处理（当前为整段离线处理）；多通道硬件验证
+  （当前单星）；弱信号（C/N0<35）PLL 带宽调优；高动态加 FLL 辅助
 
-### M4：解码 + 定位 + 实时 GUI
+### M4：解码 + 定位 + 实时 GUI（下一步）
 
 - 子帧解析基础已就绪（`gnssSubframeDecode`：TLM/HOW/数据字 + 奇偶校验）
 - 需补：星历子帧 1/2/3 字段解析、伪距计算、最小二乘定位、`uifigure` GUI
@@ -383,7 +412,8 @@ PowerShell 自动化（无需打开桌面）：
 1. 给有源天线供电（bias-T：天线 RF+DC → Pluto RF，DC 接 3.3/5 V 电源）
 2. `plutoGnssFrontEnd('DurationMs', 5000, 'Fs', 2.5e6)` 采集真实 L1
 3. `acquisition(data, fs)` → 期望捕获 ≥4 颗真实卫星（M2 验收②）
-4. 真实电文用 `demodulateNavBits` + `gnssSubframeDecode` 解析
+4. 真实电文用 `demodulateNavBits` + `gnssSubframeDecode` 解析；
+   `tracking(data, fs, acq)` 多通道跟踪
 
 ---
 
@@ -436,15 +466,15 @@ node "C:\Users\chang.su\.codex\skills\deepseek-vision-skill\scripts\describe-ima
 - ICD-GPS-200：30 位字奇偶校验算法（§20.3.5.4），本项目实现于 `gpsWordParity.m`
 - 本地官方示例：`D:\suchang\program\Pluto SDR\Matlab官方示例\`
 - 本项目报告：`docs/M2_acquisition.md`、`docs/NavData_verification.md`、
-  `docs/ContinuousNav_verification.md`（含实验图）
+  `docs/ContinuousNav_verification.md`、`docs/M3_tracking.md`（含实验图）
 
 ---
 
 ## 13. 交接检查清单（给下一个会话）
 
-- [ ] 阅读本文档（重点 §5 成果、§6 踩坑、§9 下一步）
+- [x] 阅读本文档（重点 §5 成果、§6 踩坑、§9 下一步）
 - [ ] 检查 Pluto 在线（`findPlutoRadio` / 串口 / ping）
 - [ ] 确认 `D:\13_MCP\GNSS` 与工作区 `GNSS\` 同步（SHA256）
 - [ ] 与用户确认：bias-T 是否已到货、天线是否已供电
 - [ ] 跑一次离线回归（`runAcquisitionTests`、`verifyGnssContinuousNav('Synthetic', true)`）
-- [ ] 开始 M3 前与用户对齐验收标准（跟踪环锁定、C/N0、位同步）
+- [x] M3 已完成（Synthetic + 硬件闭环 PASS）；开始 M4 前与用户对齐验收标准

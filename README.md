@@ -5,7 +5,7 @@
 
 [![MATLAB](https://img.shields.io/badge/MATLAB-R2022b-orange)](https://www.mathworks.com/products/matlab.html)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-M2%20PASS-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-M3%20PASS-brightgreen)]()
 
 ## 项目目标
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | M1 | PlutoSDR 连续采集链路验证（4 MSPS、无丢帧） | ✅ PASS (2026-08-06) |
 | M2 | 捕获模块：32 颗 PRN 并行码相位搜索（FFT） | ✅ 离线调通 (2026-08-07) |
-| M3 | 跟踪模块：DLL/PLL 多通道实时跟踪 | ⬜ 待开始 |
+| M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS (2026-08-07) |
 | M4 | 导航电文解码 + 定位解算 + 实时 GUI | ⬜ 待开始 |
 
 ## 硬件要求
@@ -50,6 +50,10 @@ verifyPlutoStream
 % 3) 捕获：离线测试（合成信号，6/6 PASS）
 addpath('GNSS-SDR-IN-MATLAB/matlab/acquisition')
 runAcquisitionTests
+
+% 4) M3 跟踪：离线合成信号验证（Synthetic 模式，无硬件）
+addpath('GNSS-SDR-IN-MATLAB/matlab/tracking')
+verifyGnssTracking('Synthetic', true)
 ```
 
 ## 仓库结构
@@ -65,7 +69,7 @@ GNSS-SDR-IN-MATLAB/
 │   │   ├── plutoGnssFrontEnd.m
 │   │   └── verifyPlutoStream.m
 │   ├── acquisition/                  # M2：捕获模块（FFT 并行码相位搜索）
-│   ├── tracking/                     # M3：跟踪模块（规划中）
+│   ├── tracking/                     # M3：跟踪模块（DLL/PLL，已验证 PASS）
 │   ├── decoding/                     # M4：导航电文解码（规划中）
 │   └── commlab/                      # 辅助模块：通信原理实验平台（调制解调演示）
 ├── data/                             # 采集数据（gitignore，不入库）
