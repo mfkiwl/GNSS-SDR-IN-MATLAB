@@ -3,6 +3,14 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.7.0] - 2026-08-07
+
+### Changed
+
+- `docs/HANDOFF.md`：全面更新项目交接文档——覆盖 M2 捕获、TX 发射、
+  50 bps 电文、连续子帧同步全部硬件验证成果，19 条关键技术结论与踩坑记录，
+  复现步骤、已知风险、M3/M4 下一步计划与交接检查清单
+
 ## [0.6.0] - 2026-08-07
 
 ### Added

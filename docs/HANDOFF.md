@@ -1,45 +1,50 @@
 # GNSS-SDR-IN-MATLAB 项目交接文档
 
-> **交接日期**：2026-08-07
+> **交接日期**：2026-08-07（第二次交接，覆盖 M2 捕获、TX 发射、50 bps 电文、
+> 连续子帧同步全部硬件验证成果）
 > **编写方**：Codex 会话（工作目录 `C:\Users\chang.su\Documents\Codex in Matlab`）
-> **目的**：为下一个 Codex 会话提供完整、准确的项目上下文，使其无需从零探索即可继续开发
+> **目的**：为下一个 Codex 会话提供完整、准确、经过实测验证的项目上下文，
+> 使其无需从零探索即可继续开发 M3/M4
 
 ---
 
 ## 1. 项目概览
 
 **目标**：用 MATLAB 驱动 ADALM-PlutoSDR 接收 GPS L1 (1575.42 MHz) 信号，完成
-**捕获 → 跟踪 → 导航电文解码 → 实时显示** 全链路，最终以实时 GUI 展示
-频谱、捕获结果、天空图、C/N0、解码导航电文与定位结果。
+**捕获 → 跟踪 → 导航电文解码 → 定位 → 实时显示** 全链路。
 
 **当前阶段**：
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M1 | PlutoSDR 连续采集链路验证（4 MSPS、无丢帧） | ✅ PASS（2026-08-06） |
-| M2 | 捕获模块：32 颗 PRN 并行码相位搜索（FFT） | ⬜ 待开发（下一步） |
-| M3 | 跟踪模块：DLL/PLL 多通道实时跟踪 | ⬜ 规划中 |
-| M4 | 导航电文解码 + 定位解算 + 实时 GUI | ⬜ 规划中 |
+| M2 | 捕获模块：32 PRN FFT 并行码相位搜索 | ✅ PASS（离线 6/6 + 硬件链路，2026-08-07） |
+| M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
+| M3 | 跟踪模块：DLL/PLL 多通道实时跟踪 | ⬜ 待开发（下一步） |
+| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 规划中 |
+
+> 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
+> （bias-T 尚未到货）。当前所有硬件验证均通过 **TX 发射合成 GPS 信号**完成，
+> 接收链路与算法已就绪，只差真实卫星。
 
 **总体架构**：
 
 ```text
 PlutoSDR (L1 1575.42 MHz)
-   │  step() 连续流 / capture() 大块离线采集
+   │  step() 连续流（实时） / capture() 大块采集（离线）
    ▼
-前端采集（matlab/frontend/，已完成）
-   │
+前端采集（matlab/frontend/，M1 完成）
    ▼
-捕获 M2（FFT 并行码相位搜索，32 PRN × 多普勒 ±10 kHz）
-   │
+捕获 M2（acquisition.m：FFT 圆周相关，32 PRN × ±10 kHz，500 Hz 步进）
    ▼
-跟踪 M3（DLL + PLL，1 ms 相干积分，C/N0）
-   │
+跟踪 M3（DLL + PLL，1-10 ms 相干积分，C/N0）【待开发】
    ▼
-解码/定位 M4（50 bps 电文 → 星历 → 伪距 → 最小二乘定位）
-   │
+解码 M4（50 bps 电文 → 子帧同步 → 星历 → 伪距 → 最小二乘定位）
+   │   ├─ 子帧编码/解码模块已就绪（gpsWordParity / generateGpsSubframe /
+   │   │   gnssSubframeDecode，连续子帧收发验证 0 错误）
+   │   └─ 星历解析、定位、GUI【待开发】
    ▼
-实时 GUI（uifigure：频谱/捕获网格/天空图/C-N0/电文/位置）
+实时 GUI（uifigure：频谱/捕获网格/天空图/C-N0/电文/位置）【待开发】
 ```
 
 ---
@@ -49,19 +54,21 @@ PlutoSDR (L1 1575.42 MHz)
 | 软件 | 版本/路径 | 说明 |
 |---|---|---|
 | MATLAB | R2022b 9.13.0.2049777，`D:\tools\matlab2022b` | 110 个工具箱 |
-| ADALM-Pluto 支持包 | Communications Toolbox Support Package for ADALM-Pluto Radio | 已安装，`findPlutoRadio`/`sdrrx`/`sdrtx` 可用 |
-| Git for Windows | 2.55.0，`C:\Program Files\Git` | 已加入系统 PATH |
-| VS Code | 1.130.x，`%LOCALAPPDATA%\Programs\Microsoft VS Code` | 已加入用户 PATH |
-| GitHub CLI | 2.97.0，已登录 `suchang-ccc`（scope: repo） | 可创建/推送仓库 |
+| ADALM-Pluto 支持包 | Communications Toolbox Support Package for ADALM-Pluto Radio | `findPlutoRadio`/`sdrrx`/`sdrtx` 可用 |
+| Satellite Communications Toolbox | `gnssCACode`/`gnssBitSynchronize` 可用 | C/A 码生成 |
+| Navigation Toolbox | `gnssconstellation` 可用 | 后续天空图用 |
+| Git for Windows | 2.55.0，`C:\Program Files\Git` | 已加入 PATH |
+| GitHub CLI | 2.97.0，已登录 `suchang-ccc`（scope: repo） | 可推送 |
 | Codex 桌面版 | 已安装 | 使用 `~/.codex/config.toml` |
 | MATLAB MCP Server | v0.11.2，`C:\Users\chang.su\.matlab\agentic-toolkits\bin\matlab-mcp-core-server-win64.exe` | Codex↔MATLAB 桥接 |
 
 ### 2.1 Codex 配置（`C:\Users\chang.su\.codex\config.toml`）
 
-`[mcp_servers.matlab]` 当前内容（注意：**用户已于 2026-08-06 13:35 自行修改**，
-将 `--initial-working-folder` 从 `D:\13_MCP` 改为 `D:\suchang\program\Pluto SDR`）：
-
 ```toml
+model = "deepseek-v4-flash"
+model_provider = "deepseek"
+model_reasoning_effort = "high"
+
 [mcp_servers.matlab]
 command = 'C:\Users\chang.su\.matlab\agentic-toolkits\bin\matlab-mcp-core-server-win64.exe'
 args = ['--matlab-root', 'D:\tools\matlab2022b', '--matlab-display-mode', 'desktop',
@@ -70,25 +77,28 @@ tool_timeout_sec = 600
 env_vars = ['WINDIR']
 ```
 
-- 配置文件有备份：`C:\Users\chang.su\.codex\config.toml.bak-20260803`（MCP 未配置前的版本）
-- 用户还添加了 `[sandbox_workspace_write] network_access = true`
-- MATLAB Agentic Toolkit skills 已安装到 `~/.codex/skills` 与 `~/.agents/skills`
-  （`matlab-create-live-script`、`matlab-debugging`、`matlab-install-products`、
-  `matlab-list-products`、`matlab-read-doc`、`matlab-review-code`、`matlab-testing`）
-- 参考仓库克隆于 `D:\12_GitHub\`：`matlab-mcp-core-server`、`matlab-agentic-toolkit`
+- 备份：`C:\Users\chang.su\.codex\config.toml.bak-20260803`
+- 用户添加了 `[sandbox_workspace_write] network_access = true`
+- **主模型为 DeepSeek（deepseek-v4-flash），不支持原生图像输入**，见 §2.2
 
-### 2.2 用户自有目录（重要上下文）
+### 2.2 图像查看（重要）
 
-`D:\suchang\program\Pluto SDR\` 是用户自建的 Pluto 工作目录（2026-07-22 起），
-**不要改动**，其内容：
+当前模型不支持 `view_image`（工具被禁用）。**图像验证统一使用已安装的
+`deepseek-vision-skill`**：
 
-| 子目录/文件 | 内容 |
-|---|---|
-| `自回环测试\` | 用户自写的 TX→RX 回环脚本：`FM.m`、`QAM16.m`、`QAM64.m` |
-| `Matlab官方示例\` | 官方示例：CaptureRFDataToBasebandFile、FMBroadcastReceiver、SpectrumAnalysis |
-| `CommLab\` | 本项目的 CommLab 副本（2026-08-04 复制）+ 运行产物 |
-| `.vscode\mcp.json` | 用户自己的 VS Code MCP 配置 |
-| `adalmplutoradio.mlpkginstall` 等 | 支持包离线安装文件 |
+```powershell
+node "C:\Users\chang.su\.codex\skills\deepseek-vision-skill\scripts\describe-image.js" "路径\图.png"
+node "C:\Users\chang.su\.codex\skills\deepseek-vision-skill\scripts\describe-image.js" --prompt "具体问题" "路径\图.png"
+```
+
+- API key 已配置在 skill 目录 `config.json`（Zhipu GLM-4V-Flash）
+- 该脚本有 provider 白名单检查（仅 deepseek-v4-flash/pro），当前配置满足
+- 程序化验证替代方案：`rms`、`max(abs)`、对象计数、`Get-FileHash`、数值统计
+
+### 2.3 用户自有目录（勿改动）
+
+`D:\suchang\program\Pluto SDR\`：用户自建 Pluto 工作目录（2026-07-22 起），
+含用户自写回环脚本（FM/QAM）、官方示例、CommLab 副本。**不要改动**。
 
 ---
 
@@ -96,27 +106,33 @@ env_vars = ['WINDIR']
 
 | 硬件 | 状态 |
 |---|---|
-| ADALM-PlutoSDR（序列号 `104473023196000bf5ff1a00aae12c3ca8`） | ✅ 可用；**交接时（08-07）不在线，需重新插拔/检查** |
-| 有源 GPS L1 天线 | ✅ 已购，**尚未通电**（等 bias-T） |
-| Bias-T 偏置器 | ⬜ 待购（选购要点见 §3.2） |
-| TX→RX 回环线（SMA 短线） | ✅ M1 验证用 |
+| ADALM-PlutoSDR（序列号 `104473023196000bf5ff1a00aae12c3ca8`） | ✅ 在线（COM3 + RNDIS + ping 192.168.2.1 通） |
+| TX 天线 | ✅ 无源拉杆天线（接 Pluto TX 口，拉到约 5 cm = 1/4 波长即可） |
+| RX 天线 | ✅ 有源 GPS 天线（接 Pluto RX 口；**未接 bias-T，LNA 不工作、无源接收**） |
+| Bias-T 偏置器 | ⬜ **待购**（真实卫星捕获的前提，见 §3.2） |
+| TX→RX 回环线（SMA 短线） | ✅ 在用户手边（M1/M2 回环验证用过） |
 
-### 3.1 PlutoSDR 识别特征
+### 3.1 识别特征
 
-- USB 串口：`PlutoSDR Serial Console (COM3)`（COM 号可能随插入顺序变化）
+- USB 串口：`PlutoSDR Serial Console (COM3)`（COM 号可能变化）
 - 网络：`PlutoSDR USB Ethernet/RNDIS Gadget`，本机 192.168.2.10 ↔ Pluto 192.168.2.1
-  （RNDIS IP 可能变化；MATLAB 对象属性中曾见 `uri: ip:10.0.0.200`，属遗留值）
-- 固件版本 **0.38**（支持包测试版本 0.34，启动时有警告，不影响使用；
-  若出现异常行为可考虑降级固件，参考 Hardware Setup App）
-- **代码中一律用 `findPlutoRadio()` 自动检测设备 ID**，不要硬编码 `usb:0`
+- 固件 0.38（支持包测试版本 0.34，启动有警告，不影响使用）
+- **代码中一律用 `findPlutoRadio()` 自动检测设备 ID，不硬编码 `usb:0`**
 
 ### 3.2 Bias-T 选购要点（给用户/采购）
 
 - 频段覆盖 1.2–1.6 GHz（含 1575.42 MHz），典型"10 MHz–6 GHz"宽带产品均可
 - 馈电 3.3 V 或 5 V（按天线标称），电流余量 ≥100 mA
-- 三端口结构：RF+DC 接天线、RF 接 Pluto（直流隔离）、DC 接电源，防直流倒灌
-- 插损 ≤1 dB；淘宝搜"GPS 偏置器 / bias-tee 5V / 有源天线馈电器"，
-  或 Mini-Circuits ZFBT-4R2G+ 系列；天线放窗边、天顶开阔处
+- 三端口：RF+DC 接天线、RF 接 Pluto（直流隔离）、DC 接电源，防直流倒灌
+- 插损 ≤1 dB；淘宝搜"GPS 偏置器 / bias-tee 5V"；天线放窗边、天顶开阔处
+
+### 3.3 实测功率标定结论（天线场景，2026-08-07）
+
+- 天线路径损耗约 **−44 dB**（相对回环线直连）
+- RX 手动增益 20 dB 时噪声底 RMS ≈ 0.0005
+- TX 增益 −30 dB → RX RMS 0.0025（C/N0≈48 dB-Hz）；−65 dB → 噪声级但可捕获
+- **推荐档位**：天线场景 TX −65 dB / 幅度 0.1 / RX 20 dB；回环线 TX −89.75 dB /
+  幅度 0.034 / RX 10 dB（详细见 §6）
 
 ---
 
@@ -130,152 +146,273 @@ env_vars = ['WINDIR']
 | `D:\13_MCP\GNSS\`（MATLAB 运行目录） | MATLAB 实际运行位置（含 `data\` 产物） |
 | `C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB\`（Git 仓库） | GitHub 仓库本地副本，`main` 分支 |
 
-**同步规则**：工作区与 `D:\13_MCP\GNSS` 内容一致（用 `Copy-Item` 双向同步并校验哈希）；
-Git 仓库结构独立（`matlab/frontend` 等），每次进展 commit + push。
+**同步规则**：工作区与 `D:\13_MCP\GNSS` 内容一致（`Copy-Item` 双向同步 + SHA256 校验）；
+Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进展 commit + push。
 
-### 4.2 前端模块文件（`matlab/frontend/`）
+### 4.2 工作区文件清单（18 个，均为 UTF-8 无 BOM）
 
 | 文件 | 功能 |
 |---|---|
-| `gnssSettings.m` | GNSS 参数：中心频率 1575.42 MHz、采样率 2.5e6、AGC、SoftGNSS 兼容格式定义 |
-| `plutoGnssFrontEnd.m` | L1 采集脚本：`findPlutoRadio` 自动检测 → `sdrrx` 配置 → `capture` 大块采集 → 存 `.mat` + SoftGNSS 兼容 int8 交织 `.bin` |
-| `verifyPlutoStream.m` | M1 验证脚本：A 前端健康 / B step 连续流 / C 回环音相位连续性 / D 大块 capture 对照 |
+| `gnssSettings.m` | 全局参数：中心频率、采样率、C/A 码参数 |
+| `plutoGnssFrontEnd.m` | L1 采集：检测 → sdrrx → capture → 存 .mat/.bin |
+| `verifyPlutoStream.m` | M1 验证脚本（A 健康/B step 流/C 回环音/D capture 对照） |
+| `acquisition.m` | **M2 捕获主函数**：FFT 圆周相关，32 PRN × ±10 kHz |
+| `generateSyntheticGpsSignal.m` | 合成信号生成器（延迟/多普勒/C-N0 可控，离线测试用） |
+| `runAcquisitionTests.m` | 捕获离线回归测试（6 项，6/6 PASS） |
+| `generateGnssTxBuffer.m` | TX 基带缓冲生成（整数码周期，可含 50 bps 电文） |
+| `plutoGnssTx.m` | 独立 TX 发射脚本 |
+| `verifyGnssLoopback.m` | 回环/天线闭环验证（TX 发射 + RX 采集 + 捕获 + 判定） |
+| `demodulateNavBits.m` | 50 bps 电文解调（精对齐、逐 ms 剥码、位同步、符号判决） |
+| `verifyGnssNavData.m` | 电文收发验证脚本（40 位测试序列，0 错误） |
+| `gpsWordParity.m` | GPS 30 位字奇偶校验（ICD-GPS-200 §20.3.5.4） |
+| `generateGpsSubframe.m` | 完整子帧生成（TLM/HOW/8 数据字，含校验） |
+| `gnssBitEdgeDetect.m` | 比特边缘检测（能量法 + 翻转直方图法） |
+| `gnssSubframeDecode.m` | 子帧同步（前导码 + 奇偶校验 + BPSK 极性消除）+ 字段解码 + 对比 |
+| `verifyGnssContinuousNav.m` | 连续子帧收发验证（Synthetic/硬件两模式） |
+| `README_GNSS.md` | 项目 README（含各验证模块用法） |
+| `README_M1.md` | M1 验证方案文档 |
 
-### 4.3 辅助模块（`matlab/commlab/`）
+### 4.3 Git 仓库结构
 
-通信原理实验平台（uifigure GUI）：AM/FM/ASK/QAM/FSK 调制解调 + TDM/FDM 复用演示。
-文件：`CommLab.m`、`genSignal.m`、`demodSignal.m`、`defaultParams.m`、
-`runCommLabTests.m`、`README.md`。核心算法与 GUI 分离，单元测试 7/7 PASS。
+```text
+GNSS-SDR-IN-MATLAB/
+├── docs/
+│   ├── project_overview.md           # 总览：硬件/架构/路线图
+│   ├── M1_streaming_verification.md  # M1 验证方案与结论
+│   ├── M2_acquisition.md             # M2 捕获模块方案与结论（含回环/天线验证）
+│   ├── NavData_verification.md       # 50 bps 电文验证报告
+│   ├── ContinuousNav_verification.md # 连续子帧验证报告（最新）
+│   ├── HANDOFF.md                    # 本文件副本
+│   └── images/                       # 验证实验图（navdata/continuous 两张）
+├── matlab/
+│   ├── frontend/                     # gnssSettings/plutoGnssFrontEnd/verifyPlutoStream
+│   ├── acquisition/                  # 捕获 + TX + 电文 + 子帧全部模块
+│   └── commlab/                      # 辅助模块（通信原理实验平台）
+├── CHANGELOG.md（0.1.0 ~ 0.6.0）
+├── README.md / LICENSE / .gitignore
+```
 
-### 4.4 文档
-
-- `docs/project_overview.md`：硬件选购、架构、路线图
-- `docs/M1_streaming_verification.md`：M1 方案与结论
-- `docs/HANDOFF.md`：本文档副本
-- `README.md`、`CHANGELOG.md`、`LICENSE`(MIT)、`.gitignore`
+**当前 HEAD**：`88a4986`（连续子帧验证 PASS）；仓库干净、与 `origin/main` 同步。
 
 ---
 
-## 5. M1 成果与关键技术结论（核心，务必理解）
+## 5. 已验证成果（按阶段，附实测数据与产物）
 
-### 5.1 M1 最终判定（2026-08-06，4 MSPS / 15 s 流 / 2 s 对照）
+### 5.1 M1：连续采集链路（2026-08-06）
 
-| 检查项 | 结果 | 实测数据 |
+- 4 MSPS / 15 s 流：帧间隔稳态 9.99 ms（≤12 ms）、p95 11.96 ms、相位跳变 0 次、
+  回环音 SNR 81 dB
+- 20 s 长稳态：1935 帧、有效吞吐 3.869 MSPS、首帧延迟 678.7 ms（一次性）
+- 产物：`D:\13_MCP\GNSS\data\verify_20260806_183737.mat/.png`
+- 核心结论：**实时必须用 `step()`；`capture()` 循环帧间不连续**
+
+### 5.2 M2：捕获模块离线测试（6/6 PASS）
+
+| 测试 | 场景 | 结果 |
 |---|---|---|
-| A. 前端健康 | ✅ PASS | RMS=0.244，削波 0.22%，DC=0.042 |
-| B. step 连续流 | ✅ PASS | 稳态帧间隔 **9.99 ms**（≤12 ms），p95=11.96 ms，max=53.5 ms |
-| C. 回环音连续性 | ✅ PASS | 频率误差 33 Hz，SNR **81.0 dB**，**相位跳变 0 次**（1500 帧） |
-| D. 大块 capture 对照 | ℹ️ 信息项 | 2 s 块完整（8M/8M 采样），耗时 4.26 s |
+| T1 | PRN5，码相位 876，多普勒 +2300 Hz，C/N0=45 | metric 25.4，参数精确 |
+| T2 | PRN12，C/N0=35（5 ms 相干 ×10） | metric 16.4，参数精确 |
+| T3 | 纯噪声 32 PRN 全扫描 | 最大 metric 3.54，零虚警 |
+| T4 | 双星 PRN3+17 | 两颗全捕获 |
+| T5 | 码相位回绕（2495/2500） | metric 9.6 |
+| T6 | 相干积分路径（IntegrationMs=5） | metric 14.5 |
 
-另有一次 20 s 长稳态测试：1935 帧、有效吞吐 **3.869 MSPS**、稳态帧间隔 **9.77 ms**、
-p95=11.16 ms、相位跳变 0、首帧延迟 678.7 ms（一次性）。
+门限标定：8 组随机种子纯噪声最大指标 3.39–3.62，**默认门限 6，余量约 1.7×**。
 
-### 5.2 六大关键发现（设计 M3 时必须遵守）
+### 5.3 回环线验证（TX 合成 GPS → RX 捕获）
 
-1. **`capture(rx, N)` 循环调用帧间不连续**——每次调用重新同步，
-   实测每帧 ~124 ms、逐帧相位跳变。**`capture` 只用于一次性大块离线采集**。
-2. **`step(rx)` 是真正的连续流接口**——帧内容首尾相接、相位连续。
-   M3 实时化必须基于 `step()`（配合双缓冲）。
-3. **测试音必须相位连续**：`transmitRepeat` 的缓冲须含整数个信号周期
-   （3 ms × 97.333 kHz = 292 整周期）。若用非整数周期（如 97.123 kHz × 1 ms），
-   TX 自身每周期跳相，会把发送端瑕疵误判为接收端丢帧（曾导致 M1 假 FAIL）。
-4. **`rx.kernelBuffersCount = 32`** 可吸收偶发调度尖峰（实测 max 53 ms 被吸收）。
-5. **首次 `step()` 有 ~0.7 s 一次性初始化延迟**——计入启动时间即可。
-6. **Pluto 的 TX/RX 基带采样率必须一致**（AD9363 共享基带时钟），
-   不一致报错 `Tx/Rx baseband sample rates do not match`。
+- TX −89.75 dB / 幅度 0.034 / RX 10 dB：**仅命中 PRN5**（metric 69，多普勒 +0.0 Hz），
+  其余 PRN 噪声级
+- 强信号档（TX −30 dB）32 颗 PRN 全部越门限——C/A 码互相关伪峰，属已知现象
+- 产物：`data\gnss_loopback_20260807_155343.mat`（干净单星结果）
 
-### 5.3 M1 结果文件
+### 5.4 天线传输验证（拉杆 TX → 有源 RX，无 bias-T）
 
-`D:\13_MCP\GNSS\data\verify_20260806_183737.mat`（完整指标）与 `.png`（图形）。
+- TX −65 dB / 幅度 0.1 / RX 20 dB：**仅命中 PRN5**（metric 37.7，多普勒 +0.0 Hz），
+  其余 PRN 3.4–3.6，领先度 10.4×
+- 证明**无 bias-T 时天线链路仍可验证**（发射信号比真实卫星强 ~80 dB）
+- 产物：`data\gnss_loopback_20260807_160409.mat`
+
+### 5.5 50 bps 导航电文收发验证
+
+- 40 位测试序列（GPS TLM 前导码 `10001011` 开头），TX −65 dB
+- 捕获 PRN5（metric 15.8，多普勒 0 Hz）；解调 **100 位 0 比特错误**（匹配率 1.000）
+- 产物：`data\gnss_navdata_20260807_162158.mat/.png`
+
+### 5.6 连续 GPS 子帧收发验证（最新，模拟真实环境）
+
+- 发射 1 个完整子帧（300 位 = 6 s：TLM 前导码 + HOW(TOW=80000) + 8 数据字，
+  含 ICD-GPS-200 奇偶校验）持续重复；`step()` 连续流采集 12 s
+- **比特边缘检测**：最优偏移 18 ms，边界翻转率 0.44（理论正确约 0.5）
+- **6 秒子帧边界同步**：前导码 + 10 字奇偶校验全部通过，起点位 233，
+  BPSK 极性消除（极性=取反）
+- 解码：TOW=80000、子帧号=1、TLM=010101；**300 位 0 比特错误**（逐位一致）
+- 产物：`data\gnss_continuous_20260807_164313.mat`（`results.txBits/bits/dec` 完整保留）
+- 报告：`docs/ContinuousNav_verification.md`（含实验图）
 
 ---
 
-## 6. 复现与验证步骤
+## 6. 关键技术结论与踩坑记录（核心，务必阅读）
+
+### 6.1 MATLAB 语言/工具箱
+
+1. **函数调用跨行续行必须写 `...`**：R2022b 中行尾逗号不自动续行，
+   否则解析报"无效表达式"。方括号内续行例外。
+2. **`gnssCACode` 返回 int8**：做算术前必须 `2*double(ca)-1`，否则与复数
+   `.*` 报"不支持复整数算术运算"。
+3. **结构数组字段裸用是逗号分隔列表**：`acq.results.PRN` 不能直接参与运算，
+   必须 `[acq.results.PRN]` 拼接。
+4. **行/列向量广播陷阱**：列向量与行向量 `==` 会隐式扩展成矩阵，
+   导致 `sum`/`&&` 结果非标量。解调比特流统一用行向量，诊断时注意方向。
+5. `.m` 文件 UTF-8 无 BOM；MATLAB 默认按 UTF-8 读取，中文注释/字符串可用；
+   **控制台输出偶发乱码**（中文标签），关键输出用 ASCII 更稳。
+
+### 6.2 捕获算法（M2）
+
+6. **FFT 相关必须是圆周相关**：FFT 长度 = 块长（1 ms 码周期），
+   不能零填充做线性相关——码相位接近码周期末尾（如 2495/2500）时线性相关
+   无法回绕对齐，峰值位置和幅度全错。
+7. **码相位语义**：从块起点到下一个码周期起点的延迟（采样点，1-based），
+   直接作为 M3 跟踪初始值。合成信号生成器用 `(n - CodePhase)` 采样码片。
+8. **多普勒格点量化**：500 Hz 步进 → 估计误差 ±250 Hz；弱信号
+   （C/N0<38 dB-Hz）须用 `IntegrationMs>1` 相干积分并缩小 `DopplerStep`
+   （5 ms 相干配 100 Hz 步进，C/N0=35 可捕获）。
+9. **检测门限 6**（峰值/噪声均值，剔除峰 ±2 点）：纯噪声 8 种子实测最大
+   3.39–3.62。
+10. **强信号互相关伪峰**：C/N0 ≥ 60 dB-Hz 时 32 PRN 全部越门限（互相关比
+    峰值低约 24 dB）。真实 GPS 电平无此问题；回环测试判定标准采用
+    "目标指标 ≥ 3× 次高"。
+
+### 6.3 PlutoSDR 硬件（TX/RX）
+
+11. **TX `Gain` 属性范围 0 ~ −89.75 dB，0 = 最大输出**（与直觉相反），
+    负值才是衰减；回环/天线测试必须从衰减档起步（初测 `Gain=0` 削波 79%）。
+12. **TX/RX 采样率必须一致**（AD9363 共享基带时钟），不一致报错
+    `Tx/Rx baseband sample rates do not match`。
+13. **`transmitRepeat` 缓冲与 `capture` 单帧上限均为 2^24 采样**
+    （16,777,216）：2.5 MSPS 下 TX 最多 1 个子帧（6 s = 15M 采样）；
+    长采集必须用 `step()` 连续流（分块 `capture` 帧间不连续，M1 结论）。
+14. **TX 缓冲必须整数个码周期**（1 ms = 2500 采样），否则 `transmitRepeat`
+    每周期跳相。电文缓冲须整数个 20 ms 比特（且 20 ms = 20 码周期）。
+15. **`kernelBuffersCount=32`** 可吸收偶发调度尖峰；首次 `step()` 有
+    ~0.7 s 一次性初始化延迟。
+
+### 6.4 电文/子帧处理
+
+16. **BPSK 180° 极性模糊**：单比特相位校准可能全反（若能量最大比特是 −1）。
+    必须由**前导码 + 奇偶校验**消除极性（真实接收机做法）——
+    `gnssSubframeDecode` 对原样/取反两种极性都验证。
+17. **参考序列对齐必须按 40 位周期 mod 循环**：对截断序列 `circshift`
+    （99 位截断、40 位周期）会破坏周期结构，产生成簇假错误。
+18. **位同步**：能量法弱信号下峰/次峰比仅 ~1.0（区分度低）；
+    **翻转直方图法**（`real(c(i)*conj(c(i+1))) < 0` 统计边界翻转率，
+    无需绝对相位）更可靠，正确对齐翻转率约 0.5。
+19. GPS 电文字结构：30 位/字 × 10 字 = 300 位/子帧 = 6 s；TLM 前导码
+    `10001011`；奇偶校验含前字 D29/D30 反馈（子帧首字前值为 0）。
+
+---
+
+## 7. 复现与验证步骤
+
+### 7.1 离线测试（无需硬件）
 
 ```matlab
 cd('D:\13_MCP\GNSS')
-verifyPlutoStream                            % 默认 4 MSPS, 15 s（需回环线）
-verifyPlutoStream('DurationSec', 30)         % 加长验证
-verifyPlutoStream('Fs', 2.5e6, 'DurationSec', 10)  % 低采样率对照
+runAcquisitionTests                          % M2 捕获 6/6
+verifyGnssContinuousNav('Synthetic', true)   % 连续子帧离线模拟
 ```
 
-自动化方式（无需打开桌面）：
+### 7.2 硬件验证（需相应接线）
+
+```matlab
+verifyPlutoStream                            % M1，需回环线
+verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034, 'RxGain', 10)  % 回环线
+verifyGnssLoopback                           % 天线场景（默认 TX -65）
+verifyGnssNavData                            % 50 bps 电文（天线场景）
+verifyGnssContinuousNav                      % 连续子帧（天线场景，12 s）
+```
+
+PowerShell 自动化（无需打开桌面）：
 
 ```powershell
-& 'D:\tools\matlab2022b\bin\matlab.exe' -batch "addpath('D:\13_MCP\GNSS'); verifyPlutoStream();"
+& 'D:\tools\matlab2022b\bin\matlab.exe' -batch "addpath('D:\13_MCP\GNSS'); <命令>;"
 ```
 
-判定：A/B/C 全部 PASS；D 仅对照。常见坑：回环线未接、测试音缓冲非整数周期、
-USB 供电不足。
+> **MATLAB -batch 注意**：每次启动约 10–30 s；函数名不能以 `_` 开头；
+> 长脚本内联注意 `%` 注释会吞掉后续内容。
 
 ---
 
-## 7. 已知问题与风险
+## 8. 已知问题与风险
 
 | 问题 | 说明与对策 |
 |---|---|
+| bias-T 未到货 | 真实卫星捕获（M2 验收②）阻塞；当前用 TX 合成信号替代验证 |
+| 室内多径 | 天线场景每比特能量波动大（min/max 差约 12 dB）；20 ms 积分余量足够，符号判决不受影响 |
+| 位同步区分度 | 能量法弱信号峰/次峰比 ~1.0；用翻转直方图法（已实现） |
+| 强信号互相关 | C/N0 ≥ 60 dB-Hz 时 32 PRN 虚警；真实电平无此问题，测试用领先度判定 |
 | 固件版本提示 | 0.38 vs 支持包测试 0.34；可继续用，异常时降级 |
-| capture 速率限制 | 有效 ~1.5 MSPS，仅离线用；实时必须 step() |
-| Pluto 在线不稳定 | 常被拔插；每次运行前 `findPlutoRadio()` 检测 |
-| MATLAB 多实例 | -batch 与桌面实例可并存；曾遇到启动瞬时挂起（150 s 无输出），重试即恢复 |
-| AGC 无信号源削波 | M1 A 项阈值已放宽（削波 <5%、DC <0.3） |
-| 无 bias-T 收不到 GPS | 天线未供电；bias-T 到货前无法捕获真实卫星 |
-| 沙箱限制 | 工作区内 `Remove-Item -Recurse -Force` 被策略拦截；`view_image` 不可用（DeepSeek 模型），图像验证用程序化手段（对象计数/文件大小/数值统计） |
-| 文件编辑限制 | `apply_patch` 只能编辑工作区相对路径；`D:` 盘文件用 PowerShell 写入/复制 |
-| 用户配置变更 | config.toml 已被用户改过（见 §2.1）；改动前先备份 |
+| Pluto 在线不稳 | 常被拔插；每次运行前 `findPlutoRadio()` 检测 |
+| MATLAB 多实例 | -batch 与桌面可并存；曾遇启动瞬时挂起（150 s 无输出），重试即恢复 |
+| view_image 不可用 | 用 deepseek-vision-skill（§2.2） |
+| 控制台中文乱码 | MATLAB 输出偶发乱码；关键数据用 ASCII 标签打印 |
 
 ---
 
-## 8. 下一步计划（M2 优先）
+## 9. 下一步计划（M3 优先）
 
-### M2：捕获模块
+### M3：跟踪模块（DLL + PLL）
 
-- **输入**：`capture(rx, fs×5)` 采集 5 s L1 数据（离线调通用），或 `step()` 实时帧
-- **算法**：FFT 并行码相位搜索——对 32 颗 PRN，搜索多普勒 ±10 kHz
-  （步进 500 Hz），用 C/A 码 FFT 相关找峰值，参考 SoftGNSS `acquisition.m`
-- **输出**：每颗卫星的码相位、多普勒频移、检测指标（峰值/噪声比）
-- **本机辅助**：Satellite Communications Toolbox 提供 `gnssCACode`（C/A 码生成）、
-  `gnssBitSynchronize`；Navigation Toolbox 提供 `gnssconstellation`
-- **验收**：① 用合成信号（带延迟/多普勒）能正确捕获；② bias-T 到货接天线后
-  能捕获 ≥4 颗真实卫星
-- **文件规划**：`matlab/acquisition/acquisition.m` + 测试脚本
-
-### M3：跟踪模块
-
-- `step()` 连续流 + 10 ms 帧批处理，每通道 DLL（码环）+ PLL（载波环）
-- 双缓冲：后台采集线程持续 `step()`，主线程处理
-- 验收：C/N0 稳定、环路锁定、位同步
+- **输入初值**：`acquisition.m` 输出的 `codePhase`（采样点）与 `dopplerHz`
+- **架构**：`step()` 连续流 + 双缓冲（后台采集线程持续 step，主线程处理），
+  10 ms 帧批处理；每通道 DLL（码环）+ PLL（载波环），1–10 ms 相干积分，输出 C/N0
+- **可复用资产**：`demodulateNavBits` 的逐 ms 剥码逻辑、`gnssBitEdgeDetect`
+  翻转法、`generateGnssTxBuffer`（闭环测试发射源）
+- **验证**：先用现有 TX 发射链路（回环/天线）做闭环测试；验收标准：
+  C/N0 稳定、环路锁定、位同步成功（已有翻转法基线）
+- 参考：SoftGNSS `tracking.m`（perrysou/GNSS_SDR）；MathWorks 官方 Pluto 捕获/跟踪示例
 
 ### M4：解码 + 定位 + 实时 GUI
 
-- 50 bps 导航电文 → 子帧解析 → 星历 → 伪距 → 最小二乘定位
-- GUI 参考 CommLab 的 `uifigure` 技术栈
-- 实时显示：频谱、捕获网格、天空图、C/N0、电文、位置
+- 子帧解析基础已就绪（`gnssSubframeDecode`：TLM/HOW/数据字 + 奇偶校验）
+- 需补：星历子帧 1/2/3 字段解析、伪距计算、最小二乘定位、`uifigure` GUI
+  （频谱/捕获网格/天空图/C-N0/电文/位置），参考 CommLab 的 uifigure 技术栈
+
+### 硬件：bias-T 到货后
+
+1. 给有源天线供电（bias-T：天线 RF+DC → Pluto RF，DC 接 3.3/5 V 电源）
+2. `plutoGnssFrontEnd('DurationMs', 5000, 'Fs', 2.5e6)` 采集真实 L1
+3. `acquisition(data, fs)` → 期望捕获 ≥4 颗真实卫星（M2 验收②）
+4. 真实电文用 `demodulateNavBits` + `gnssSubframeDecode` 解析
 
 ---
 
-## 9. 工作流约定
+## 10. 工作流约定
 
-1. **GitHub 更新**：每次有进展 → 更新代码 + `CHANGELOG.md` + 相关文档 →
-   `git add/commit/push`（仓库：`C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB`，
-   远端：`github.com/suchang-ccc/GNSS-SDR-IN-MATLAB`，public）
+1. **GitHub 更新**：每次进展 → 更新代码 + `CHANGELOG.md` + 相关文档 →
+   `git add/commit/push`（仓库：`C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB`）
 2. **与用户中文交流**，结论先行，文件用绝对路径链接
 3. **测试先行**：核心改动后用 `matlab -batch` 跑验证脚本
-4. **文件同步**：工作区 ↔ `D:\13_MCP\GNSS` 保持哈希一致
-5. **设备操作谨慎**：涉及硬件（TX 发射、串口、SDR）前先与用户确认
+4. **文件同步**：工作区 ↔ `D:\13_MCP\GNSS` 保持 SHA256 一致
+5. **设备操作谨慎**：涉及硬件（TX 发射、串口、SDR）前先与用户确认；
+   TX 发射仅限室内低功率短时（1575.42 MHz 为受保护频段）
 
 ---
 
-## 10. 常用命令速查
+## 11. 常用命令速查
 
 ```powershell
 # MATLAB 自动化
 & 'D:\tools\matlab2022b\bin\matlab.exe' -batch "addpath('D:\13_MCP\GNSS'); <命令>;"
 
 # 设备检测
-[System.IO.Ports.SerialPort]::GetPortNames()
 Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -match 'Pluto' }
+[System.IO.Ports.SerialPort]::GetPortNames()
 Test-Connection 192.168.2.1 -Count 2
+
+# 同步与哈希校验
+Copy-Item -LiteralPath <工作区文件> -Destination <D:\13_MCP\GNSS\文件> -Force
+(Get-FileHash -LiteralPath <文件> -Algorithm SHA256).Hash
 
 # Git（仓库目录）
 git -C 'C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB' status -sb
@@ -283,32 +420,31 @@ git -C 'C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB' add -A
 git -C 'C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB' commit -m "feat: ..."
 git -C 'C:\Users\chang.su\Documents\GNSS-SDR-IN-MATLAB' push
 
-# GitHub
-gh repo view suchang-ccc/GNSS-SDR-IN-MATLAB
+# 图像查看（当前模型不支持 view_image）
+node "C:\Users\chang.su\.codex\skills\deepseek-vision-skill\scripts\describe-image.js" "图.png"
 ```
 
 ---
 
-## 11. 参考资料
+## 12. 参考资料
 
 - [perrysou/GNSS_SDR](https://github.com/perrysou/GNSS_SDR)：SoftGNSS v3.0，
-  MATLAB 离线接收机（采集→捕获→跟踪→定位），其 `initSettings.m` 关键参数：
-  `dataType='int8'`、`IF=9.548e6`、`samplingFreq=38.192e6`、`codeFreqBasis=1.023e6`、
-  `codeLength=1023`、`acqSearchBand=14e3`、`acqThreshold=2.5`
+  MATLAB 离线接收机（采集→捕获→跟踪→定位）
 - [gnss-sdr/gnss-sdr](https://github.com/gnss-sdr/gnss-sdr)：C++ 实时接收机，
-  原生 PlutoSDR 信号源（`plutosdr_signal_source`）；官方实时配置：
-  `SignalSource.device_address=192.168.2.1`、`sampling_frequency=4000000`
+  原生 PlutoSDR 信号源
 - [MathWorks: GPS Receiver Acquisition and Tracking Using Pluto SDR](https://www.mathworks.com/help/satcom/ug/gps-receiver-acquisition-and-tracking-using-pluto-sdr.html)
+- ICD-GPS-200：30 位字奇偶校验算法（§20.3.5.4），本项目实现于 `gpsWordParity.m`
 - 本地官方示例：`D:\suchang\program\Pluto SDR\Matlab官方示例\`
-- [Bilkent 便携 GNSS 接收机项目](https://ee.bilkent.edu.tr/fuar/2026/group_b6/project_page_b6.html)
-- [NTNU 论文（Pluto+GPS 实测）](https://ntnuopen.ntnu.no/ntnu-xmlui/handle/11250/3155908)
+- 本项目报告：`docs/M2_acquisition.md`、`docs/NavData_verification.md`、
+  `docs/ContinuousNav_verification.md`（含实验图）
 
 ---
 
-## 12. 交接检查清单（给下一个会话）
+## 13. 交接检查清单（给下一个会话）
 
-- [ ] 阅读本文档
-- [ ] 检查 Pluto 是否在线（`findPlutoRadio` / 串口 / ping）
-- [ ] 确认 `D:\13_MCP\GNSS` 与工作区 `GNSS\` 同步
-- [ ] 与用户确认：bias-T 是否已到货、天线是否接好
-- [ ] 开始 M2 前与用户对齐验收标准
+- [ ] 阅读本文档（重点 §5 成果、§6 踩坑、§9 下一步）
+- [ ] 检查 Pluto 在线（`findPlutoRadio` / 串口 / ping）
+- [ ] 确认 `D:\13_MCP\GNSS` 与工作区 `GNSS\` 同步（SHA256）
+- [ ] 与用户确认：bias-T 是否已到货、天线是否已供电
+- [ ] 跑一次离线回归（`runAcquisitionTests`、`verifyGnssContinuousNav('Synthetic', true)`）
+- [ ] 开始 M3 前与用户对齐验收标准（跟踪环锁定、C/N0、位同步）
