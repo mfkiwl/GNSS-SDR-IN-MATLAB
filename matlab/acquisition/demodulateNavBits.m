@@ -11,6 +11,7 @@ function out = demodulateNavBits(data, fs, acq, prn, varargin)
 %
 %   可选参数 (Name-Value):
 %     'ReferenceBits' - 已知参考电文比特（用于位同步与匹配统计）
+%     'BitOffsetMs'   - 指定位同步偏移 (0~19 ms)，跳过自动搜索
 %     'CodePhase'     - 覆盖码相位（1-based），默认取捕获结果
 %     'DopplerHz'     - 覆盖多普勒 (Hz)，默认取捕获结果
 %
@@ -27,6 +28,7 @@ function out = demodulateNavBits(data, fs, acq, prn, varargin)
 %% ---- 参数 ----
 p = struct();
 p.ReferenceBits = [];
+p.BitOffsetMs  = [];
 p.CodePhase = [];
 p.DopplerHz  = [];
 
@@ -35,6 +37,7 @@ for k = 1:2:numel(varargin)
     val = varargin{k+1};
     switch lower(key)
         case 'referencebits', p.ReferenceBits = val(:).';
+        case 'bitoffsetms',   p.BitOffsetMs = val;
         case 'codephase',     p.CodePhase = val;
         case 'dopplerhz',     p.DopplerHz = val;
         otherwise, error('未知参数: %s', key);
@@ -126,7 +129,10 @@ for k = 0:19
 end
 
 %% ---- 选择最佳位同步偏移 ----
-if ~isempty(p.ReferenceBits)
+if ~isempty(p.BitOffsetMs)
+    bestK = p.BitOffsetMs + 1;                % 1-based 索引
+    bestK = max(1, min(numel(cands), bestK));
+elseif ~isempty(p.ReferenceBits)
     [~, bestK] = max([cands.score]);
 else
     bestK = 1;                            % 无参考时默认偏移 0 ms

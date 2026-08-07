@@ -3,6 +3,28 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/gpsWordParity.m`：GPS 30 位字奇偶校验（ICD-GPS-200）
+- `matlab/acquisition/generateGpsSubframe.m`：完整子帧电文生成（TLM/HOW/数据字）
+- `matlab/acquisition/gnssBitEdgeDetect.m`：比特边缘检测（能量法 + 翻转直方图法）
+- `matlab/acquisition/gnssSubframeDecode.m`：子帧边界同步（前导码 + 奇偶校验 +
+  BPSK 极性消除）与字段解码
+- `matlab/acquisition/verifyGnssContinuousNav.m`：连续子帧收发验证脚本
+  （TX 持续发射 → RX step() 连续流 → 自主同步 → 解码对比）
+- `docs/ContinuousNav_verification.md`：验证报告（含实验图）
+
+### Key Findings (连续电文验证)
+
+- **BPSK 180° 极性模糊**须由前导码 + 奇偶校验消除（单比特相位校准可能全反）
+- Pluto `transmitRepeat` 缓冲与 `capture` 单帧均受 2^24 采样上限约束：
+  2.5 MSPS 下 TX 最多 1 子帧（6 s），长采集须用 `step()` 连续流
+- 位同步翻转直方图法优于纯能量法（弱信号下能量峰/次峰比仅 ~1.0，
+  正确边界翻转率实测 0.44，接近理论 0.5）
+- 硬件验证 PASS：6 秒子帧边界同步成功，电文 0 比特错误
+
 ## [0.5.0] - 2026-08-07
 
 ### Added

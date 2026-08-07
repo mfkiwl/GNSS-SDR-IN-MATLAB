@@ -136,6 +136,8 @@ verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034)   % 需 TX→RX 回�
 
 50 bps 导航电文收发验证（PASS，0 比特错误）详见
 [NavData_verification.md](NavData_verification.md)。
+连续 GPS 子帧电文收发验证（PASS，6 秒子帧边界同步，0 比特错误）详见
+[ContinuousNav_verification.md](ContinuousNav_verification.md)。
 
 ```matlab
 % 1) 采集（需天线 + bias-T 供电）
