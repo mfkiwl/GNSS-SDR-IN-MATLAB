@@ -3,6 +3,28 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/generateGnssTxBuffer.m`：Pluto TX 基带缓冲生成器
+  （合成 GPS C/A 码，整数码周期，可选 50 bps 电文）
+- `matlab/acquisition/plutoGnssTx.m`：独立发射脚本（回环/天线测试）
+- `matlab/acquisition/verifyGnssLoopback.m`：回环闭环验证
+  （TX 发射合成 GPS → RX 采集 → 捕获 → 判定）
+
+### Changed
+
+- README、docs/M2_acquisition.md：补充回环验证结果与 TX 功率标定说明
+
+### Key Findings (回环验证)
+
+- **Pluto TX `Gain` 范围 0 ~ -89.75 dB，0 = 最大输出**；负值才是衰减，
+  回环直连时 RX 会严重饱和（初测削波 79%）
+- 回环信号 TX/RX 共时钟，捕获多普勒精确 0 Hz
+- 强信号（C/N0 ≥ 60 dB-Hz）下 C/A 码互相关使 32 PRN 全部越门限；
+  真实 GPS 功率量级（C/N0≈45 dB-Hz）下只剩目标星，判定标准为目标指标 ≥ 3× 次高
+
 ## [0.2.0] - 2026-08-07
 
 ### Added

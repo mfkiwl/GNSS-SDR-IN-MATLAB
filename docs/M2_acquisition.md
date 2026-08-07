@@ -80,6 +80,37 @@ runAcquisitionTests      % 6 项回归测试
 
 总用时约 50 s（MATLAB R2022b，D:\13_MCP\GNSS）。
 
+## 回环验证（TX 合成 GPS → RX 捕获）
+
+在真实卫星不可用的条件下，用 Pluto TX 发射合成 GPS L1 C/A 码，RX 接收后捕获，
+验证全射频链路（2026-08-07，回环线 TX→RX 直连，2.5 MSPS）：
+
+| 项 | 结果 |
+|---|---|
+| 目标星 | PRN5 命中，metric 69.0，多普勒 **+0.0 Hz**（共时钟），码相位任意 |
+| 其余 PRN | 3.4 ~ 4.1（噪声级，无虚警） |
+| 领先度 | 17.8×（判定标准 ≥3×） |
+| 结论 | **PASS** |
+
+关键发现（踩坑记录）：
+
+1. **Pluto TX `Gain` 属性范围 0 ~ -89.75 dB，0 = 最大输出**。
+   最初沿用 M1 的 `Gain=0` 并以"最低功率"注释，实际是最大功率，
+   回环线直连导致 RX 削波 79%。校准后确认：负值才是衰减。
+2. **强信号 C/A 码互相关**：C/N0 ≈ 66+ dB-Hz 时，32 颗 PRN 全部越过门限 6，
+   这是强信号互相关伪峰（真实 GPS 信号互相关比峰值低 ~24 dB，低于噪声底）。
+   把功率压到真实 GPS 量级（TX Gain=-89.75 dB + 幅度 0.034，C/N0≈45 dB-Hz）
+   后只剩目标星。判定标准采用"目标指标 ≥ 3× 次高"以兼容强信号场景。
+3. TX 缓冲必须为整数个 C/A 码周期（20 ms = 50000 采样），保证 `transmitRepeat`
+   相位连续（沿用 M1 结论）；TX/RX 采样率一致（2.5 MSPS）。
+
+复现：
+
+```matlab
+cd('GNSS-SDR-IN-MATLAB/matlab/acquisition')
+verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034)   % 需 TX→RX 回环线
+```
+
 ## 真实信号接入步骤（待 bias-T）
 
 ```matlab
