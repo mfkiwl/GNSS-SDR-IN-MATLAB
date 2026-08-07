@@ -76,6 +76,30 @@
   等效），比对须按字段范围取模
 - CDDIS 需 Earthdata 认证，改用 Garner/BKG IGS 镜像
 
+## [0.10.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/gnssEphDecode.m`：M4 星历解析——子帧 1/2/3 →
+  26 个星历字段（位宽/缩放/有符号性与官方 HelperGPSLNAVDataDecode 一致）
+- `matlab/acquisition/satellitePosition.m`：广播星历 → 卫星 ECEF 位置
+  与钟差（IS-GPS-200L §20.3.3.4，开普勒迭代 + 谐波摄动 + 地球自转）
+- `matlab/acquisition/verifyGnssEphDecode.m`：M4.1 验证脚本
+  （阶段 A 确定性 + 阶段 B 24 s 合成闭环，字段对比 + 轨道/星座物理校验）
+- `docs/M4_ephemeris.md`：验证报告
+
+### Key Findings (M4.1 星历解析)
+
+- **PASS**：阶段 A/B 均 26/26 字段与官方 RINEX 一致；Synthetic 闭环
+  捕获 metric 125.5、跟踪 C/N0 43.9 dB-Hz、0/1185 误码后星历还原无误
+- **32 星整周期对径比 0.9963±0.0041**：GPS 周期 ≈ 半个恒星日，一个
+  周期后地球自转 ~180°，ECEF 位置对径（≈2r）——开普勒传播 + ECEF
+  坐标旋转的独立物理验证
+- ECEF 60 s 位移可达 ~350 km（轨道运动 + 地球自转视运动叠加），按
+  [100,400] km 判定并附加轨道半径稳定性检查
+- 星历外推超出拟合区间（2 h）会产生伪近星（PRN13/32 实测 663 km），
+  星座校验须在每星自身 Toe 处计算
+
 ## [0.6.0] - 2026-08-07
 
 ### Added

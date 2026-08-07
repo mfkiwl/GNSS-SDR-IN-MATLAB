@@ -22,7 +22,7 @@
 | M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
 | M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS（2026-08-07，详见 §5.7） |
 | M3.5 | 官方 RINEX 星历电文：官方数据 + MathWorks 编码链路 + 闭环验证 | ✅ PASS（Synthetic + 硬件闭环，2026-08-07，详见 §5.8） |
-| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 待开发（下一步） |
+| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | 🔄 M4.1 星历解析+卫星位置 PASS（2026-08-07，详见 §5.9）；定位/GUI 待开发 |
 
 > 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
 > （bias-T 尚未到货）。当前所有硬件验证均通过 **TX 发射合成 GPS 信号**完成，
@@ -175,6 +175,9 @@ Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进
 | `readRinexNav.m` | **M3.5** RINEX 2.11 GPS 广播星历解析器（`rinexread` 不支持 2.x） |
 | `rinexToGpsCfg.m` | **M3.5** RINEX → 官方 HelperGPSCEIConfig → LNAV 子帧编码 |
 | `verifyOfficialEphemeris.m` | **M3.5** 官方电文验证：官方解码 33 字段交叉验证 + Synthetic 闭环 |
+| `gnssEphDecode.m` | **M4.1** 子帧 1/2/3 → 星历 26 字段解析（位宽/缩放与官方解码器一致） |
+| `satellitePosition.m` | **M4.1** 星历 → 卫星 ECEF 位置 + 钟差（IS-GPS-200 §20.3.3.4） |
+| `verifyGnssEphDecode.m` | **M4.1** 验证：字段对比 + 轨道/星座物理校验（阶段 A/B） |
 | `README_GNSS.md` | 项目 README（含各验证模块用法） |
 | `README_M1.md` | M1 验证方案文档 |
 
@@ -287,6 +290,19 @@ GNSS-SDR-IN-MATLAB/
 - 产物：`data/official_ephemeris_20260807_181520.mat/.png`；
   报告：`docs/OfficialEphemeris_verification.md`；硬件产物：
   `data/official_ephemeris_20260807_182300.mat/.png`
+
+### 5.9 M4.1 星历解析 + 卫星位置（2026-08-07）
+
+- **链路**：官方 RINEX/编码 → TX 900 位 → 捕获 → DLL/PLL 跟踪 →
+  `gnssSubframeDecode` → `gnssEphDecode`（26 字段）→ `satellitePosition`
+- **阶段 A（确定性）PASS**：26/26 字段与官方 RINEX 量化容差内一致；
+  32 星整周期对径比 0.9963±0.0041（ECEF 下开普勒传播独立物理验证）
+- **阶段 B（24 s 合成闭环）PASS**：捕获 metric 125.5、跟踪 C/N0 43.9
+  dB-Hz、**0/1185 误码**，星历还原 26/26、卫星位置 r=2.642e7 m 合理
+- 踩坑：ECEF 60 s 位移可达 ~350 km（含地球自转视运动）；星历外推超出
+  2 h 拟合区间产生伪近星；整周期对径是 ECEF 下的正确强校验
+- 产物：`data/gnss_eph_decode_20260807_183432.mat`；
+  报告：`docs/M4_ephemeris.md`
 
 ---
 
