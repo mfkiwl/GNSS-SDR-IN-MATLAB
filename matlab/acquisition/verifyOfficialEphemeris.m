@@ -143,8 +143,11 @@ try
         fprintf('[SYN] 合成信号 %.1f s（%d 采样），缓冲 900 位子帧1-3\n', ...
             nSamp/p.Fs, nSamp);
     else
+        sfBits = sf1;                       % 硬件 TX 仅子帧 1（6 s 缓冲）
+        results.txBits = sfBits;
+        results.txMetas = out.metas(1);
         buf = generateGnssTxBuffer(p.PRN, p.Fs, 'Amplitude', 0.1, ...
-            'NavBits', sf1);   % 硬件 TX 仅子帧 1（6 s 缓冲）
+            'NavBits', sf1);
         if numel(buf) > 2^24
             error('TX 缓冲 %d 采样超过 Pluto 上限 2^24', numel(buf));
         end
@@ -205,7 +208,7 @@ try
 
     %% ---- 6. 子帧同步 + 解码 ----
     fprintf('[SYNC] gnssSubframeDecode（前导码 + 奇偶校验）...\n');
-    ref = struct('bits', sfBits, 'metas', out.metas(1:3));
+    ref = struct('bits', sfBits, 'metas', out.metas(1:numel(sfBits)/300));
     dec = gnssSubframeDecode(t1.bits, 'Reference', ref);
     results.dec = dec;
     nOK = 0;

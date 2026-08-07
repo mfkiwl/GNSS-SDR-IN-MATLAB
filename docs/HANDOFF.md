@@ -21,7 +21,7 @@
 | M2 | 捕获模块：32 PRN FFT 并行码相位搜索 | ✅ PASS（离线 6/6 + 硬件链路，2026-08-07） |
 | M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
 | M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS（2026-08-07，详见 §5.7） |
-| M3.5 | 官方 RINEX 星历电文：官方数据 + MathWorks 编码链路 + 闭环验证 | ✅ PASS（2026-08-07，详见 §5.8） |
+| M3.5 | 官方 RINEX 星历电文：官方数据 + MathWorks 编码链路 + 闭环验证 | ✅ PASS（Synthetic + 硬件闭环，2026-08-07，详见 §5.8） |
 | M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 待开发（下一步） |
 
 > 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
@@ -278,11 +278,15 @@ GNSS-SDR-IN-MATLAB/
 - **Synthetic 闭环 PASS**：编码一致性 33/33 字段、奇偶 30/30 字、
   捕获精确命中（+1200 Hz、码相位 778、领先度 28.6）、跟踪 C/N0 43.8
   dB-Hz、**0/915 误码**、子帧解码全匹配
+- **硬件闭环 PASS**（天线场景 TX −65 dB，官方子帧 1，12.5 s step 流）：
+  捕获 metric 26.9 / 领先度 7.6、跟踪 C/N0 36.7 dB-Hz、**0/609 误码**、
+  子帧 TOW=75603 全字段匹配
 - **重大修复：自研奇偶链 ICD 不合规**——`gpsWordParity` 补全 HOW（字 2）
   与字 10 的 D29/D30=0（反馈重置）和 D30 位反转；修复后自研链与官方
   Helper 链四向逐位互操作，M3/M2.5 回归 PASS
 - 产物：`data/official_ephemeris_20260807_181520.mat/.png`；
-  报告：`docs/OfficialEphemeris_verification.md`
+  报告：`docs/OfficialEphemeris_verification.md`；硬件产物：
+  `data/official_ephemeris_20260807_182300.mat/.png`
 
 ---
 

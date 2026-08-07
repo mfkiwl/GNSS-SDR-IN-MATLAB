@@ -1,9 +1,10 @@
 # 官方 RINEX 星历 → 官方编码 → TX/RX 闭环验证报告
 
 > **日期**：2026-08-07（与 M3 跟踪验证同日）
-> **结论**：**PASS** —— 编码一致性 33/33 字段、奇偶 30/30 字、Synthetic 闭环
-> 捕获精确命中 + DLL/PLL 跟踪 0/915 误码 + 子帧解码全匹配
-> **产物**：`data/official_ephemeris_20260807_181520.mat/.png`
+> **结论**：**PASS（Synthetic + 硬件闭环双模式）** —— 编码一致性 33/33 字段、
+> 奇偶 30/30 字；Synthetic 0/915 误码；硬件（天线 TX−65 dB）0/609 误码
+> **产物**：`data/official_ephemeris_20260807_181520.mat/.png`（Synthetic）、
+> `data/official_ephemeris_20260807_182300.mat/.png`（硬件闭环）
 
 ---
 
@@ -120,6 +121,21 @@ DeltaN-2^-27），解码还原为回绕值——这是字段固有属性，物�
 结论：**PASS（编码一致性=33/33 奇偶=1 捕获=1 锁定=1 C/N0=1 参数=1
 子帧=2）**
 
+### 4.3 硬件闭环（天线场景，2026-08-07）
+
+```text
+[TX] 已发射官方子帧1 合成 GPS（6 s 缓冲，增益 -65 dB）  ← 天线发射
+[RX] 硬件闭环采集 12.5 s 完成
+[ACQ] PRN  5: metric=26.9 doppler=+0.0 Hz codePhase=2231 领先度=7.6
+[TRK] PRN  5: lock=1 CN0=36.7 dB-Hz f=+0.00 Hz bitSync=15 ms
+  比特误码=0/609
+[SYNC] 子帧 1: TOW=75603 子帧号=1 比特错误=0 全字段匹配=PASS
+```
+
+结论：**PASS（编码一致性=33/33 奇偶=1 捕获=1 锁定=1 C/N0=1 参数=1
+子帧=1）**。C/N0 36.7 dB-Hz 与 M3 硬件闭环（35.9）一致；0/609 误码。
+硬件 TX 单缓冲 6 s = 1 子帧（300 位），完整 3 子帧星历仍由 Synthetic 验证。
+
 ## 5. 重大发现：自研奇偶链 ICD 不合规（已修复）
 
 用官方编码器交叉验证时暴露了 `gpsWordParity` 的**两处 ICD 偏差**：
@@ -178,5 +194,5 @@ Invoke-WebRequest 'https://igs.bkg.bund.de/root_ftp/IGS/BRDC/2026/219/BRDC00WRD_
 
 - 星历子帧 1/2/3 解析已随本验证落地（`rinexToGpsCfg` 字段映射即 M4
   解析的逆向）；M4 需实现从解调子帧提取星历并计算卫星位置
-- 硬件闭环 TX 官方子帧 1 已就绪（`verifyOfficialEphemeris('Synthetic', false)`），
-  涉及射频发射，需用户确认后执行
+- 硬件闭环 TX 官方子帧 1 已验证 PASS（2026-08-07，天线场景）；后续如需
+  连续播发完整 5 子帧帧结构，需实现 TX 缓冲切换（每 6 s 换下一子帧）
