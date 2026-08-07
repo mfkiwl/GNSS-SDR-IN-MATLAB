@@ -48,9 +48,13 @@ for pol = [1, 0]
         ok = true;
         prevD29 = 0; prevD30 = 0;
         for w = 1:10
-            [recalc, d29, d30] = gpsWordParity(words(w, 1:24), prevD29, prevD30);
-            prevD29 = d29; prevD30 = d30;
-            if ~isequal(recalc, words(w, :)), ok = false; break; end
+            tx = words(w, :);
+            % ICD 位反转还原：逻辑数据 = 发送 bit1..24 XOR 前字 D30
+            log24 = mod(tx(1:24) + prevD30, 2);
+            [recalc, ~, ~] = gpsWordParity(log24, prevD29, prevD30, w);
+            prevD29 = tx(29);
+            prevD30 = tx(30);
+            if ~isequal(recalc, tx), ok = false; break; end
         end
         if ok
             validIdx(end+1) = p0; %#ok<AGROW>
@@ -61,7 +65,7 @@ end
 out.syncIndex = validIdx;
 out.polarity  = validPol;
 
-%% ---- 解析有效子帧 ----
+%% ---- 解析有效子帧（先逐字还原 D30 位反转，再提取字段）----
 sfDec = struct('tlmMsg', {}, 'tlmCount', {}, 'tow', {}, ...
     'subframeId', {}, 'dataWords', {}, 'parityOK', {});
 for k = 1:numel(validIdx)
@@ -70,11 +74,17 @@ for k = 1:numel(validIdx)
     b2  = bits;
     if pol == 0, b2 = 1 - bits; end
     words = reshape(b2(p0 : p0+299), 30, 10).';
-    sfDec(k).tlmMsg     = words(1, 9:14);
-    sfDec(k).tlmCount   = bi2de(words(1, 17:22), 'left-msb');
-    sfDec(k).tow        = bi2de(words(2, 1:17), 'left-msb');
-    sfDec(k).subframeId = bi2de(words(2, 20:22), 'left-msb');
-    sfDec(k).dataWords  = words(3:10, 1:24);
+    logWords = zeros(10, 24);
+    prevD30 = 0;
+    for w = 1:10
+        logWords(w, :) = mod(words(w, 1:24) + prevD30, 2);
+        prevD30 = words(w, 30);
+    end
+    sfDec(k).tlmMsg     = logWords(1, 9:14);
+    sfDec(k).tlmCount   = bi2de(logWords(1, 17:22), 'left-msb');
+    sfDec(k).tow        = bi2de(logWords(2, 1:17), 'left-msb');
+    sfDec(k).subframeId = bi2de(logWords(2, 20:22), 'left-msb');
+    sfDec(k).dataWords  = logWords(3:10, :);
     sfDec(k).parityOK   = true;
     sfDec(k).polarity   = pol;
 end

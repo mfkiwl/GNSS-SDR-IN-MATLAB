@@ -21,6 +21,7 @@
 | M2 | 捕获模块：32 PRN FFT 并行码相位搜索 | ✅ PASS（离线 6/6 + 硬件链路，2026-08-07） |
 | M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
 | M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS（2026-08-07，详见 §5.7） |
+| M3.5 | 官方 RINEX 星历电文：官方数据 + MathWorks 编码链路 + 闭环验证 | ✅ PASS（2026-08-07，详见 §5.8） |
 | M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ⬜ 待开发（下一步） |
 
 > 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
@@ -171,6 +172,9 @@ Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进
 | `verifyGnssContinuousNav.m` | 连续子帧收发验证（Synthetic/硬件两模式） |
 | `tracking.m` | **M3 跟踪主函数**：DLL+PLL 多通道跟踪、C/N0、位同步、锁定判定 |
 | `verifyGnssTracking.m` | M3 验证脚本（Synthetic/硬件闭环双模式，端到端子帧对比） |
+| `readRinexNav.m` | **M3.5** RINEX 2.11 GPS 广播星历解析器（`rinexread` 不支持 2.x） |
+| `rinexToGpsCfg.m` | **M3.5** RINEX → 官方 HelperGPSCEIConfig → LNAV 子帧编码 |
+| `verifyOfficialEphemeris.m` | **M3.5** 官方电文验证：官方解码 33 字段交叉验证 + Synthetic 闭环 |
 | `README_GNSS.md` | 项目 README（含各验证模块用法） |
 | `README_M1.md` | M1 验证方案文档 |
 
@@ -263,6 +267,22 @@ GNSS-SDR-IN-MATLAB/
   0.020 采样、频率误差 0.11 Hz；609 位 **0 误码**；子帧解码 1/1
 - 产物：`data\gnss_tracking_20260807_173214.mat`（硬件）/ `_173105.mat`（Synthetic）
 - 报告：`docs/M3_tracking.md`（含实验图）；代码在 `matlab/tracking/`
+
+### 5.8 官方 RINEX 星历电文验证（2026-08-07）
+
+- **官方数据源**：Garner UCSD `auto2190.26n`（RINEX 2.11，481 条记录 /
+  32 PRN）+ BKG IGS `BRDC00WRD_R_20262190000_01D_MN.rnx`（RINEX 3 组合）；
+  CDDIS 需 Earthdata 认证故用 IGS 镜像
+- **链路**：`readRinexNav`/`rinexread` → `rinexToGpsCfg` →
+  MathWorks 官方 `HelperGPSNAVDataEncode`（IS-GPS-200L）→ TX/RX 闭环
+- **Synthetic 闭环 PASS**：编码一致性 33/33 字段、奇偶 30/30 字、
+  捕获精确命中（+1200 Hz、码相位 778、领先度 28.6）、跟踪 C/N0 43.8
+  dB-Hz、**0/915 误码**、子帧解码全匹配
+- **重大修复：自研奇偶链 ICD 不合规**——`gpsWordParity` 补全 HOW（字 2）
+  与字 10 的 D29/D30=0（反馈重置）和 D30 位反转；修复后自研链与官方
+  Helper 链四向逐位互操作，M3/M2.5 回归 PASS
+- 产物：`data/official_ephemeris_20260807_181520.mat/.png`；
+  报告：`docs/OfficialEphemeris_verification.md`
 
 ---
 
@@ -406,6 +426,9 @@ PowerShell 自动化（无需打开桌面）：
 - 子帧解析基础已就绪（`gnssSubframeDecode`：TLM/HOW/数据字 + 奇偶校验）
 - 需补：星历子帧 1/2/3 字段解析、伪距计算、最小二乘定位、`uifigure` GUI
   （频谱/捕获网格/天空图/C-N0/电文/位置），参考 CommLab 的 uifigure 技术栈
+- **官方星历链路已铺好**（M3.5）：`rinexToGpsCfg` 的字段映射即 M4 星历
+  解析的逆向；M4 直接从解调子帧提取星历（子帧 1=钟差/完好性、
+  2/3=开普勒根数+谐波）计算卫星位置
 
 ### 硬件：bias-T 到货后
 

@@ -13,6 +13,8 @@ mlx/
 matlab/frontend/data/*
 data/*
 !data/.gitkeep
+!data/auto2190.26n
+!data/BRDC00WRD_R_20262190000_01D_MN.rnx
 
 # ---------- 操作系统 ----------
 .DS_Store

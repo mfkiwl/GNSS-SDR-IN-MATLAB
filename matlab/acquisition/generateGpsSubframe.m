@@ -50,25 +50,27 @@ else
     end
 end
 
-%% ---- 逐字组装 + 奇偶校验 ----
+%% ---- 逐字组装 + 奇偶校验（ICD-GPS-200 §20.3.5.4，含 D30 位反转与
+%      HOW/字10 特例，与官方 MathWorks HelperGPSNAVDataEncode 兼容）----
 preamble = [1 0 0 0 1 0 1 1];
 pD29 = 0; pD30 = 0;      % 子帧首字的前字校验位为 0
 
 % 字 1: TLM
-tlmL = [preamble, p.TlmMsg, 1, 1, zeros(1,6), 0, 0];
-[w1, pD29, pD30] = gpsWordParity(tlmL, pD29, pD30);
+% 结构: 前导码(8) + TlmMsg(6) + 保留(6) + 完好性(1) + 备用(1)
+tlmL = [preamble, p.TlmMsg, zeros(1, 8), 0, 0];
+[w1, pD29, pD30] = gpsWordParity(tlmL, pD29, pD30, 1);
 
 % 字 2: HOW
 tow17 = de2bi(tow, 17, 'left-msb');
 sfid3 = de2bi(subframeId, 3, 'left-msb');
 howL = [tow17, 0, 0, sfid3, 0, 0];
-[w2, pD29, pD30] = gpsWordParity(howL, pD29, pD30);
+[w2, pD29, pD30] = gpsWordParity(howL, pD29, pD30, 2);
 
 % 字 3..10: 数据字
 words = cell(1, 10);
 words{1} = w1; words{2} = w2;
 for w = 1:8
-    [words{w+2}, pD29, pD30] = gpsWordParity(p.DataWords(w, :), pD29, pD30);
+    [words{w+2}, pD29, pD30] = gpsWordParity(p.DataWords(w, :), pD29, pD30, w+2);
 end
 
 bits300 = cell2mat(words(:).');
@@ -79,7 +81,16 @@ meta.subframeId = subframeId;
 meta.tow        = tow;
 meta.tlmMsg     = p.TlmMsg;
 meta.preamble   = preamble;
-meta.dataWords  = p.DataWords;
+% 数据字用"实际发送的逻辑位"：字 10 的 bit23/24 为 ICD 反推值（非原始输入），
+% 逐字还原 D30 位反转后与 gnssSubframeDecode 的解码口径一致
+logData = zeros(8, 24);
+prevD30 = 0;                 % 字 2（HOW）后反馈重置为 0
+for w = 3:10
+    tx = words{w};
+    logData(w-2, :) = mod(tx(1:24) + prevD30, 2);
+    prevD30 = tx(30);
+end
+meta.dataWords  = logData;
 meta.words30    = reshape(bits300, 30, 10).';   % 10x30，每行一个字
 meta.bits300    = bits300;
 end

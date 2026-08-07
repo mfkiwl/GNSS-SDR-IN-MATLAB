@@ -38,6 +38,41 @@
 - 端到端子帧解码需 ≥ 600 位跟踪比特（12 s 采集）保证任意对齐下含完整子帧
 - 参考比特匹配须测双极性（BPSK 180° 极性模糊）
 
+## [0.9.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/readRinexNav.m`：RINEX 2.11 GPS 广播星历解析器
+  （自包含，R2022b `rinexread` 仅支持 RINEX 3）
+- `matlab/acquisition/rinexToGpsCfg.m`：官方 RINEX（2/3）→
+  `HelperGPSCEIConfig` → `HelperGPSNAVDataEncode` LNAV 编码链路，
+  自动跳过零占位星历、按历元换算 TOW、填入电离层/UTC 参数
+- `matlab/acquisition/verifyOfficialEphemeris.m`：官方电文端到端验证
+  （官方解码 33 字段交叉验证 + Synthetic 闭环）
+- `data/auto2190.26n`（Garner UCSD）、`data/BRDC00WRD_R_20262190000_01D_MN.rnx`
+  （BKG IGS 组合）：2026-08-07 官方广播星历样本
+- `docs/OfficialEphemeris_verification.md`：验证报告（含实验图）
+
+### Changed
+
+- `gpsWordParity.m`：补全 ICD-GPS-200 §20.3.5.4 两项规则——HOW（字 2）
+  与字 10 的 D29/D30 恒为 0（反馈重置），以及前字 D30=1 时本字 bit1..24
+  位反转；新增 wordNumber 参数
+- `generateGpsSubframe.m`：TLM 字改为 ICD 形状；逐字传字序号；
+  `meta.dataWords` 改为实际发送逻辑位（字 10 的 bit23/24 为 ICD 反推值）
+- `gnssSubframeDecode.m`：校验与字段提取先还原 D30 位反转，按字序号
+  校验（含 HOW/字 10 特例）
+
+### Key Findings (官方星历验证)
+
+- **PASS（Synthetic 闭环）**：编码一致性 33/33 字段、奇偶 30/30 字、
+  捕获精确命中、跟踪 C/N0 43.8 dB-Hz、0/915 误码、子帧解码全匹配
+- **自研奇偶链原不合 ICD**：连续 D29/D30 链且无位反转，自洽但无法与
+  官方 Helper 链互操作；修复后四向交叉验证全过，M3/M2.5 回归 PASS
+- RINEX 2 的 M0/DeltaN 等超范围字段按 ICD 字段位宽二补码回绕（物理
+  等效），比对须按字段范围取模
+- CDDIS 需 Earthdata 认证，改用 Garner/BKG IGS 镜像
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
