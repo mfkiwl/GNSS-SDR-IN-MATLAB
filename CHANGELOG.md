@@ -3,6 +3,23 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-08-07
+
+### Added
+
+- `matlab/acquisition/demodulateNavBits.m`：50 bps 导航电文解调
+  （码相位精对齐、逐 ms 剥码、位同步、40 位周期参考对齐、符号判决）
+- `matlab/acquisition/verifyGnssNavData.m`：导航电文收发验证脚本
+  （TX 发射带电文合成 GPS → RX 采集 → 捕获 → 解调 → 画图 → 存档）
+- `docs/NavData_verification.md`：验证报告（含实验图）
+
+### Key Findings (导航电文验证)
+
+- 天线场景（拉杆 TX → 有源 RX，无 bias-T）100 位电文 **0 比特错误**，匹配率 1.000
+- 参考对齐必须按 **40 位周期**循环生成（`mod` 索引），不能对截断序列 `circshift`：
+  99 不是 40 的倍数，截断序列循环移位会破坏周期结构、产生成簇假错误
+- 室内天线场景每比特相干能量存在多径幅度波动，但不影响 20 ms 积分后的符号判决
+
 ## [0.4.0] - 2026-08-07
 
 ### Added

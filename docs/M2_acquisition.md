@@ -134,6 +134,9 @@ verifyGnssLoopback('TxGain', -89.75, 'TxAmplitude', 0.034)   % 需 TX→RX 回�
 
 ## 真实信号接入步骤（待 bias-T）
 
+50 bps 导航电文收发验证（PASS，0 比特错误）详见
+[NavData_verification.md](NavData_verification.md)。
+
 ```matlab
 % 1) 采集（需天线 + bias-T 供电）
 plutoGnssFrontEnd('DurationMs', 5000, 'Fs', 2.5e6)
