@@ -22,7 +22,7 @@
 | M2.5 | TX 合成 GPS 发射 + 50 bps 电文 + 连续子帧收发验证 | ✅ PASS（2026-08-07） |
 | M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS（2026-08-07，详见 §5.7） |
 | M3.5 | 官方 RINEX 星历电文：官方数据 + MathWorks 编码链路 + 闭环验证 | ✅ PASS（Synthetic + 硬件闭环，2026-08-07，详见 §5.8） |
-| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | 🔄 M4.1 星历解析 PASS + M4.2 多星定位 PASS（Synthetic 2026-08-07 + **硬件闭环 2026-08-10**，详见 §5.9/5.10）；实时 GUI 待开发 |
+| M4 | 导航电文子帧解析 + 定位解算 + 实时 GUI | ✅ 核心完成：M4.1 星历解析 + M4.2 多星定位（Synthetic 08-07 + 硬件闭环 08-10）+ 实时 GUI（详见 §5.9-5.12）；真实卫星定位待 bias-T |
 
 > 注意：M2 的验收标准②"捕获 ≥4 颗真实卫星"仍未完成——原因是**有源天线未供电**
 > （bias-T 尚未到货）。当前所有硬件验证均通过 **TX 发射合成 GPS 信号**完成，
@@ -182,6 +182,7 @@ Git 仓库结构独立（`matlab/frontend`、`matlab/acquisition`），每次进
 | `gnssPseudorange.m` | **M4.2** 跟踪+子帧 → 伪距（亚毫秒比特边界解析） |
 | `leastSquaresPosition.m` | **M4.2** 伪距最小二乘定位（位置+钟差，含 GDOP） |
 | `verifyGnssPositioning.m` | **M4.2** 定位验证（注入真实星座几何，参考点上海） |
+| `gnssLiveGui.m` | **M4 GUI** uifigure 实时显示（C/N0 曲线/天空图/解码电文/定位结果） |
 | `README_GNSS.md` | 项目 README（含各验证模块用法） |
 | `README_M1.md` | M1 验证方案文档 |
 
@@ -336,6 +337,16 @@ GNSS-SDR-IN-MATLAB/
 - 演示：`demoGnssPositioning('Synthetic', false, 'MsgPRN', 11)`
   产物：`data/demo_gnss_positioning_20260810_105452_*.png`；
   报告：`docs/M4_positioning.md` 附录 A
+
+### 5.12 M4 实时显示 GUI（2026-08-10）
+
+- `gnssLiveGui.m`：uifigure 实时界面——C/N0 动态曲线（播放/暂停/滑杆）、
+  天空图（方位/仰角）、解码电文面板（子帧比特 + TLM/HOW + 数据字）、
+  定位结果面板（经纬高/误差/GDOP/残差）
+- 三种模式：跑合成定位后打开 / 硬件（`'Synthetic', false`）/ 载入结果
+  回放（`'LoadFile', <mat>`）；`SnapshotFile` 无头截图验证
+- 实测：载入硬件多星结果回放正常（6 星曲线、电文 TOW=78295、定位
+  PASS 132.7 m）
 
 ---
 

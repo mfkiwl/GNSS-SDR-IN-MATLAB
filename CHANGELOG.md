@@ -151,6 +151,20 @@
 - 单星基线验证：`verifyOfficialEphemeris('Synthetic', false)` 今天仍
   PASS（CN0 39.1，0/609 误码）——RF 环境稳定，问题定位为捕获配置
 
+## [0.13.0] - 2026-08-10
+
+### Added
+
+- `matlab/acquisition/gnssLiveGui.m`：M4 实时显示 GUI（uifigure）——
+  C/N0 实时曲线（播放/暂停/滑杆）、天空图（方位/仰角）、解码电文面板
+  （子帧比特 + TLM/HOW + 数据字）、定位结果面板（经纬高/误差/GDOP/残差）；
+  支持合成/硬件/载入结果回放三种模式，`SnapshotFile` 无头截图
+
+### Key Findings
+
+- GUI 载入硬件多星定位结果回放正常（6 星 C/N0 曲线、电文 TOW=78295、
+  定位 PASS 132.7 m）
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
