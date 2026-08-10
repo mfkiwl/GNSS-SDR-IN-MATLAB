@@ -15,6 +15,9 @@ function buf = generateMultiSatTxBuffer(prnList, fs, varargin)
 %     'Amplitudes'    - 每颗星幅度（默认全 0.3）
 %     'DopplersHz'    - 每颗星载波多普勒（默认全 0；注意 transmitRepeat
 %                       缓冲回绕时载波相位跳变，小多普勒可接受）
+%     'Normalize'     - 是否把叠加结果归一化到峰值 1（默认 true；
+%                       硬件 TX 建议 false + 每星幅度 0.1，保持与单星
+%                       已验证档位一致，避免归一化把单星功率压得太低）
 %
 %   输出:
 %     buf - Nx1 复基带（整数个码周期，可 transmitRepeat）
@@ -30,6 +33,7 @@ p.DelaysSamples = zeros(1, numel(prnList));
 p.NavBitsList   = {};
 p.Amplitudes    = 0.3 * ones(1, numel(prnList));
 p.DopplersHz    = zeros(1, numel(prnList));
+p.Normalize     = true;
 
 for k = 1:2:numel(varargin)
     key = varargin{k};
@@ -39,6 +43,7 @@ for k = 1:2:numel(varargin)
         case 'navbitslist',   p.NavBitsList = val;
         case 'amplitudes',    p.Amplitudes = val(:).';
         case 'dopplershz',    p.DopplersHz = val(:).';
+        case 'normalize',     p.Normalize = val;
         otherwise, error('未知参数: %s', key);
     end
 end
@@ -79,7 +84,10 @@ for i = 1:nSat
     buf = buf + circshift(sig, d);
 end
 
-% 整体归一化（保持峰值不超过 1，便于 TX 幅度控制）
-buf = buf / max(abs(buf));
-buf = buf(:);
+% 整体归一化（保持峰值不超过 1，便于 TX 幅度控制；硬件多星需关掉）
+if p.Normalize
+    buf = buf / max(abs(buf));
+end
+buf = complex(buf(:), 0);   % 强制复数类：MATLAB 的 + 会把零虚部折叠成实数，
+                            % 而 Pluto TX 要求 I/Q（complex）输入
 end

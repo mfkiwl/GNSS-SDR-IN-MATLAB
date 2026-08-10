@@ -19,6 +19,7 @@ function results = verifyGnssPositioning(varargin)
 %         'Fs' / 'PllBandwidth' / 'DllBandwidth' / 'CorrSpacing'
 
 p = struct();
+p.Synthetic   = true;
 p.NumSats     = 6;
 p.RefLat      = 31.2304;      % 上海市中心（WGS84）
 p.RefLon      = 121.4737;
@@ -30,30 +31,50 @@ p.Fs          = 2.5e6;
 p.PllBandwidth = 18;
 p.DllBandwidth = 2;
 p.CorrSpacing  = 0.5;
+p.AcqIntegrationMs = 5;
+p.TxGain       = -65;
+p.TxAmplitude  = 0.1;
+capSet = false;
+acqSet = false;
+txSet  = false;
 
 for k = 1:2:numel(varargin)
     key = varargin{k};
     val = varargin{k+1};
     switch lower(key)
+        case 'synthetic',      p.Synthetic = val;
         case 'numsats',      p.NumSats = val;
         case 'reflat',       p.RefLat = val;
         case 'reflon',       p.RefLon = val;
         case 'refh',         p.RefH = val;
         case 'rinexfile',    p.RinexFile = val;
-        case 'capturesec',   p.CaptureSec = val;
+        case 'capturesec',   p.CaptureSec = val; capSet = true;
         case 'cn0',          p.CN0 = val;
         case 'fs',           p.Fs = val;
         case 'pllbandwidth', p.PllBandwidth = val;
         case 'dllbandwidth', p.DllBandwidth = val;
         case 'corrspacing',  p.CorrSpacing = val;
+        case 'acqintegrationms', p.AcqIntegrationMs = val; acqSet = true;
+        case 'txgain',       p.TxGain = val; txSet = true;
+        case 'txamplitude',  p.TxAmplitude = val;
         otherwise, error('未知参数: %s', key);
     end
+end
+if ~p.Synthetic && ~capSet
+    p.CaptureSec = 12.5;      % 硬件：6 s 缓冲（子帧 1），12.5 s 采集
+end
+if ~p.Synthetic
+    % 硬件多星实测结论：5 ms 相干捕获在多星/弱信号下码相位会锁错周期
+    % （多周期圆周相关歧义），须用 1 ms；TX 增益 -60 dB 保证单星 CN0 ~43
+    if ~acqSet, p.AcqIntegrationMs = 1; end
+    if ~txSet,  p.TxGain = -60; end
 end
 
 c = 299792458;
 results = struct();
 results.params = p;
 results.pass = false;
+tx = []; rx = [];
 
 try
     fprintf('==========================================================\n');
@@ -114,38 +135,85 @@ try
         rng_i = norm(cand(i).pos - X0);
         delays(i) = round(rng_i * p.Fs / c);       % 采样点
         out = rinexToGpsCfg(nav, prns(i), 'Tow', tow);
-        navbits{i} = [out.subframes(1,:), out.subframes(2,:), out.subframes(3,:)];
+        if p.Synthetic
+            navbits{i} = [out.subframes(1,:), out.subframes(2,:), ...
+                out.subframes(3,:)];
+        else
+            navbits{i} = out.subframes(1,:);   % 硬件 TX 仅子帧 1（6 s）
+        end
         fprintf('  PRN %2d: 真实距离 %.1f km → 延迟 %d 采样 (%.2f ms)\n', ...
             prns(i), rng_i/1e3, delays(i), delays(i)/p.Fs*1e3);
     end
     results.injected = struct('prns', prns, 'delays', delays, 'T_sf', T_sf, ...
         'satPos', [cand.pos], 'X0', X0);
 
-    %% ---- 4. 多星 TX 缓冲 + 合成信号 ----
-    fprintf('[TX] 生成 %d 星叠加缓冲（900 位 = 18 s）...\n', p.NumSats);
-    buf = generateMultiSatTxBuffer(prns, p.Fs, ...
-        'DelaysSamples', delays, 'NavBitsList', navbits, ...
-        'Amplitudes', 0.3*ones(1, p.NumSats));
+    %% ---- 4. 多星 TX 缓冲 + 合成/硬件信号 ----
+    fprintf('[TX] 生成 %d 星叠加缓冲（%d 位 = %.1f s）...\n', p.NumSats, ...
+        numel(navbits{1}), numel(navbits{1})*0.02);
+    if p.Synthetic
+        buf = generateMultiSatTxBuffer(prns, p.Fs, ...
+            'DelaysSamples', delays, 'NavBitsList', navbits, ...
+            'Amplitudes', 0.3*ones(1, p.NumSats));
+    else
+        buf = generateMultiSatTxBuffer(prns, p.Fs, ...
+            'DelaysSamples', delays, 'NavBitsList', navbits, ...
+            'Amplitudes', p.TxAmplitude*ones(1, p.NumSats), ...
+            'Normalize', false);
+    end
     fprintf('  缓冲 %d 采样（%.1f s），峰值 %.3f\n', numel(buf), ...
         numel(buf)/p.Fs, max(abs(buf)));
 
-    nSamp = round(p.Fs * p.CaptureSec);
-    nRep = ceil(nSamp / numel(buf));
-    data0 = repmat(buf, nRep, 1);
-    data0 = data0(1:nSamp);
-    A_sat = 1 / p.NumSats;                        % 归一化后单星峰值近似
-    sigma = A_sat * sqrt(p.Fs / 10^(p.CN0/10));
-    rng(20260807);
-    noise = (randn(nSamp,1) + 1j*randn(nSamp,1)) * sigma/sqrt(2);
-    data = data0 + noise;
-    fprintf('[SYN] %.1f s 信号，目标单星 C/N0=%d dB-Hz（σ=%.3e）\n', ...
-        nSamp/p.Fs, p.CN0, sigma);
-    clear buf data0;
+    if p.Synthetic
+        nSamp = round(p.Fs * p.CaptureSec);
+        nRep = ceil(nSamp / numel(buf));
+        data0 = repmat(buf, nRep, 1);
+        data0 = data0(1:nSamp);
+        A_sat = 1 / p.NumSats;                    % 归一化后单星峰值近似
+        sigma = A_sat * sqrt(p.Fs / 10^(p.CN0/10));
+        rng(20260807);
+        noise = (randn(nSamp,1) + 1j*randn(nSamp,1)) * sigma/sqrt(2);
+        data = data0 + noise;
+        fprintf('[SYN] %.1f s 信号，目标单星 C/N0=%d dB-Hz（σ=%.3e）\n', ...
+            nSamp/p.Fs, p.CN0, sigma);
+        clear buf data0;
+    else
+        if numel(buf) > 2^24
+            error('TX 缓冲 %d 采样超过 Pluto 上限 2^24', numel(buf));
+        end
+        r = findPlutoRadio();
+        if isempty(r), error('未找到 PlutoSDR'); end
+        radioID = r(1).RadioID;
+        tx = sdrtx('Pluto', 'RadioID', radioID, ...
+            'CenterFrequency', 1575.42e6, 'BasebandSampleRate', p.Fs, ...
+            'Gain', p.TxGain);
+        tx.transmitRepeat(buf);
+        fprintf('[TX] 已发射 %d 星叠加（子帧1，增益 %.1f dB，幅度 %.2f）\n', ...
+            p.NumSats, p.TxGain, p.TxAmplitude);
+        pause(0.5);
+        nSamp = round(p.Fs * p.CaptureSec);
+        frameSamples = round(p.Fs * 0.01);
+        rx = sdrrx('Pluto', 'RadioID', radioID, ...
+            'CenterFrequency', 1575.42e6, 'BasebandSampleRate', p.Fs, ...
+            'GainSource', 'Manual', 'Gain', 20, 'OutputDataType', 'double', ...
+            'SamplesPerFrame', frameSamples);
+        try, rx.kernelBuffersCount = 32; catch, end
+        nFrames = round(nSamp / frameSamples);
+        data = zeros(nFrames * frameSamples, 1);
+        for kk = 1:nFrames
+            data((kk-1)*frameSamples + (1:frameSamples)) = step(rx);
+        end
+        release(rx); delete(rx); rx = [];
+        release(tx); delete(tx); tx = [];
+        fprintf('[RX] 硬件闭环采集 %.1f s 完成，RMS=%.5f\n', ...
+            nSamp/p.Fs, rms(data));
+        clear buf;
+    end
 
     %% ---- 5. 多通道捕获 + 跟踪 ----
     fprintf('[ACQ] 捕获 ...\n');
     acq = acquisition(data, p.Fs, 'Verbose', false, ...
-        'IntegrationMs', 5, 'NonCoherentN', 10, 'DopplerStep', 100);
+        'IntegrationMs', p.AcqIntegrationMs, 'NonCoherentN', 10, ...
+        'DopplerStep', 100);
     det = [acq.results.PRN];
     det = det([acq.results.detected]);
     miss = setdiff(prns, det);
@@ -178,14 +246,20 @@ try
         sf  = dec.subframes(sf1idx);
         [rho(i), eCode] = gnssPseudorange(t1, sf, dec.syncIndex(sf1idx), p.Fs);
         eCodeAll(i) = eCode;
-        ep = gnssEphDecode(dec.subframes);
-        satPosRx(:, i) = satellitePosition(ep, (sf.tow - 1)*6);
+        if p.Synthetic
+            ep = gnssEphDecode(dec.subframes);
+            satPosRx(:, i) = satellitePosition(ep, (sf.tow - 1)*6);
+        else
+            % 硬件仅发射子帧 1：卫星位置用 RINEX 已知星历
+            satPosRx(:, i) = satellitePosition(cand(i).eph, (sf.tow - 1)*6);
+        end
         fprintf('  PRN %2d: 子帧 TOW=%d 锚定采样=%d 伪距=%.3f km\n', ...
             prns(i), sf.tow, eCode, rho(i)/1e3);
     end
     % 所有星须锚定在同一 18 s 重复周期内（伪距时标一致性）
-    if max(eCodeAll) - min(eCodeAll) > 18e3 * p.Fs
-        error('卫星锚定跨 18 s 重复周期，伪距时标不一致');
+    if max(eCodeAll) - min(eCodeAll) > numel(navbits{1})*0.02 * p.Fs
+        error('卫星锚定跨重复周期（%.1f s），伪距时标不一致', ...
+            numel(navbits{1})*0.02);
     end
     results.rho = rho;
     results.satPosRx = satPosRx;
@@ -226,6 +300,15 @@ catch err
     fprintf('\n[验证中断]: %s\n', err.message);
     results.error = err.message;
     results.pass = false;
+end
+
+%% ---- 清理硬件 ----
+for obj = {rx, tx}
+    o = obj{1};
+    if ~isempty(o) && isvalid(o)
+        try, release(o); catch, end
+        try, delete(o); catch, end
+    end
 end
 
 %% ---- 保存 ----

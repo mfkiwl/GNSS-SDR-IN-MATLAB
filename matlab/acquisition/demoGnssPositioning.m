@@ -56,7 +56,11 @@ if p.Synthetic
         'RefLat', p.RefLat, 'RefLon', p.RefLon, 'RefH', p.RefH, ...
         'CaptureSec', p.CaptureSec);
 else
-    error('硬件模式请直接运行 verifyGnssPositioning 对应分支（需发射确认）');
+    % 硬件多星：TX 6 星叠加（子帧1）→ RX 有源天线（发射需确认）
+    fprintf('[HW] 硬件多星定位（TX 6 星叠加 → RX 天线），即将发射 ...\n');
+    results = verifyGnssPositioning('Synthetic', false, ...
+        'NumSats', p.NumSats, 'RefLat', p.RefLat, 'RefLon', p.RefLon, ...
+        'RefH', p.RefH);
 end
 
 if ~isfield(results, 'trk')
@@ -98,7 +102,7 @@ fprintf(' 解码原始电文数据：PRN %d（子帧 %d，TOW %d）\n', ...
     p.MsgPRN, decAll{msgIdx}.subframes(sf1i).subframeId, ...
     decAll{msgIdx}.subframes(sf1i).tow);
 fprintf('==========================================================\n');
-printNavMessage(trk(msgIdx), decAll{msgIdx}, ephAll{msgIdx});
+printNavMessage(trk(msgIdx), decAll{msgIdx}, ephAll{msgIdx}, p.Synthetic);
 for i = 1:p.NumSats
     if i == msgIdx, continue; end
     i1 = find([decAll{i}.subframes.subframeId] == 1, 1);
@@ -216,8 +220,11 @@ saveas(f5, [pngBase '_5_position.png']);
 %% ---- 图6：解码原始电文（位梯 + 字段）----
 f6 = figure('Name', '解码原始电文', 'Position', [360 360 980 640]);
 sf  = decAll{msgIdx}.subframes(sf1i);
-sidx = decAll{msgIdx}.syncIndex(1);
-subframeBits = trk(msgIdx).bits(sidx : sidx + 299);   % 极性已消除
+sidx = decAll{msgIdx}.syncIndex(sf1i);
+subframeBits = trk(msgIdx).bits(sidx : sidx + 299);
+if decAll{msgIdx}.polarity(sf1i) == 0
+    subframeBits = 1 - subframeBits;                  % BPSK 180° 极性校正
+end
 drawBitLadder(subframeBits);
 title(sprintf('PRN %d 原始电文子帧 1（300 位，TOW %d）', ...
     p.MsgPRN, sf.tow));
@@ -264,12 +271,15 @@ results.demoPng = pngBase;
 end
 
 %% ---- 工具：控制台打印解码电文 ----
-function printNavMessage(t1, dec, eph)
+function printNavMessage(t1, dec, eph, syntheticFlag)
 sf1idx = find([dec.subframes.subframeId] == 1, 1);
 if isempty(sf1idx), sf1idx = 1; end
 sf  = dec.subframes(sf1idx);
 sidx = dec.syncIndex(sf1idx);
 bits300 = t1.bits(sidx : sidx + 299);
+if dec.polarity(sf1idx) == 0
+    bits300 = 1 - bits300;                            % BPSK 180° 极性校正
+end
 words = reshape(bits300, 30, 10).';
 
 % 还原逻辑数据（D30 位反转）
@@ -300,6 +310,11 @@ for w = 3:10
 end
 
 fprintf('\n星历解析（26 字段）:\n');
+if syntheticFlag
+    fprintf('  （星历来自接收信号解码）\n');
+else
+    fprintf('  （硬件仅发射子帧 1，星历由 RINEX 已知数据提供）\n');
+end
 names = {'Af0(s)','Af1(s/s)','Af2(s/s^2)','Toc(s)','Week','IODE','IODC', ...
     'TGD(s)','URA','SVHealth','sqrtA(m^.5)','Ecc','M0(半周)','DeltaN(半周/s)', ...
     'Toe(s)','Cuc','Cus','Cic','Cis','Crc','Crs','Omega0(半周)','omega(半周)', ...

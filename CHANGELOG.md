@@ -126,6 +126,31 @@
   几何不一致；28 s 采集保证任意对齐含完整子帧 1
 - 多星 18 s 重复周期歧义为公共时标误差，被最小二乘钟差吸收
 
+## [0.12.0] - 2026-08-10
+
+### Added
+
+- `verifyGnssPositioning` 硬件模式：TX 6 星叠加（子帧 1，6 s 缓冲）→
+  有源天线 RX 12.5 s → 多通道跟踪 → 伪距 → 最小二乘定位；新增
+  `Synthetic`/`TxGain`/`TxAmplitude`/`AcqIntegrationMs` 参数
+- `generateMultiSatTxBuffer` 新增 `Normalize` 开关（硬件多星须关闭，
+  保持每星幅度与单星已验证档位一致）；修复零虚部被 MATLAB `+` 折叠成
+  实数的问题（强制 `complex`）
+- `demoGnssPositioning` 支持硬件模式（`'Synthetic', false`），含原始
+  电文输出（BPSK 极性校正）
+
+### Key Findings (硬件多星定位)
+
+- **PASS**：6/6 星捕获+锁定（CN0 43.5~44.5 dB-Hz），伪距 vs 注入真值
+  **4.1 m**，定位误差 **132.7 m**（参考点上海，GDOP 7.7，残差 RMS 21 m）
+- **5 ms 相干捕获的多周期歧义**：圆周相关对周期码有 ±1 ms 等高峰，
+  多星/弱信号下部分卫星锁错周期（码相位偏 500~1000 采样，DLL 无法牵引）；
+  硬件多星捕获须用 **1 ms 相干积分**（实测 6 星码相位全部精确）
+- 硬件 TX 增益 −60 dB（+5 dB）保证多星下每星 CN0 ~43；单星基线 -65 dB
+  仍 CN0 39 正常
+- 单星基线验证：`verifyOfficialEphemeris('Synthetic', false)` 今天仍
+  PASS（CN0 39.1，0/609 误码）——RF 环境稳定，问题定位为捕获配置
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
