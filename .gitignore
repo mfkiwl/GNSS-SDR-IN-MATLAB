@@ -11,6 +11,8 @@ mlx/
 
 # ---------- 采集与验证输出（大文件不入库） ----------
 matlab/frontend/data/*
+matlab/acquisition/data/*
+matlab/tracking/data/*
 data/*
 !data/.gitkeep
 !data/auto2190.26n

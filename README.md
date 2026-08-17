@@ -5,7 +5,7 @@
 
 [![MATLAB](https://img.shields.io/badge/MATLAB-R2022b-orange)](https://www.mathworks.com/products/matlab.html)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-M3%20PASS-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-M5%20PASS-brightgreen)]()
 
 ## 项目目标
 
@@ -18,13 +18,16 @@
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M1 | PlutoSDR 连续采集链路验证（4 MSPS、无丢帧） | ✅ PASS (2026-08-06) |
-| M2 | 捕获模块：32 颗 PRN 并行码相位搜索（FFT） | ✅ 离线调通 (2026-08-07) |
+| M2 | 捕获模块：32 颗 PRN 并行码相位搜索（FFT） | ✅ PASS (2026-08-07) |
 | M3 | 跟踪模块：DLL/PLL 多通道跟踪（Synthetic + 硬件闭环） | ✅ PASS (2026-08-07) |
-| M4 | 导航电文解码 + 定位解算 + 实时 GUI | ⬜ 待开始 |
+| M4 | 导航电文解码 + 星历/定位解算 + 实时 GUI | ✅ PASS (2026-08-17，硬件闭环定位 133/136 m) |
+| M5 | 真实卫星接收：窗外有源天线（Bias-T），完整导航电文 + 广播星历解码 | ✅ PASS (2026-08-17，PRN 27，GPS Week 384) |
 
 ## 硬件要求
 
 - ADALM-PlutoSDR（USB 连接，识别为串口 + RNDIS 网卡）
+- 7020-SDR 新板（Z7020+AD9361，MATLAB 支持包直接识别，固件 0.38；
+  板载 **0.5 ppm TCXO**，L1 频偏约 ±0.8 kHz，工作点 TX −60 dB / RX 40 dB）
 - 有源 GPS L1 天线（内置 LNA，需 3–5 V 馈电）
 - **Bias-T 偏置器**：给有源天线馈电，同时通过 L1 射频（详见 [docs/project_overview.md](docs/project_overview.md)）
 - TX→RX 回环线（SMA 短线，用于 M1 数据链路验证）
@@ -54,6 +57,9 @@ runAcquisitionTests
 % 4) M3 跟踪：离线合成信号验证（Synthetic 模式，无硬件）
 addpath('GNSS-SDR-IN-MATLAB/matlab/tracking')
 verifyGnssTracking('Synthetic', true)
+
+% 5) 长采集（真实卫星完整导航电文，≥30 s；自动丢弃 step() 流启动瞬态 10 s）
+plutoGnssFrontEnd('DurationMs', 35000, 'GainMode', 'Manual', 'GainDb', 50)
 ```
 
 ## 仓库结构
@@ -68,11 +74,12 @@ GNSS-SDR-IN-MATLAB/
 │   │   ├── gnssSettings.m
 │   │   ├── plutoGnssFrontEnd.m
 │   │   └── verifyPlutoStream.m
-│   ├── acquisition/                  # M2：捕获模块（FFT 并行码相位搜索）
+│   ├── acquisition/                  # M2/M4：捕获、子帧同步、电文解码、星历/定位、GUI
 │   ├── tracking/                     # M3：跟踪模块（DLL/PLL，已验证 PASS）
-│   ├── decoding/                     # M4：导航电文解码（规划中）
+│   ├── decoding/                     # M4：导航电文解码（并入 acquisition 验证脚本）
 │   └── commlab/                      # 辅助模块：通信原理实验平台（调制解调演示）
-├── data/                             # 采集数据（gitignore，不入库）
+├── data/                             # 采集数据与导出（gitignore，不入库）
+│   └── prn27_navdata_20260817.txt    # 真实卫星比特流 + 原始子帧 + 星历导出示例
 ├── CHANGELOG.md
 ├── LICENSE
 └── README.md

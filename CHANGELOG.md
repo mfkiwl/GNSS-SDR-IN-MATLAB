@@ -3,6 +3,48 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.18.0] - 2026-08-17
+
+### Added
+
+- **真实卫星接收里程碑（M5）PASS**：窗外有源天线（Bias-T）+ 7020-SDR 新板
+  （Z7020+AD9361，0.5 ppm TCXO），PRN 27 锁定 C/N0 44.5~45.6 dB-Hz，
+  解出完整导航电文（SF1~SF4 连续子帧，奇偶校验通过）与广播星历
+  （GPS Week 384、IODE/IODC=22、全部开普勒参数，与 RINEX/IS-GPS-200 一致）
+- 数据导出流程：`data/prn27_navdata_20260817.txt`
+  （1584 bit 解调流 + 4 子帧原始 300 bit/30-bit 字 + 星历字段）
+
+### Changed
+
+- README 里程碑/状态徽章同步至 M5 PASS；硬件要求补充 7020-SDR 新板与
+  0.5 ppm TCXO；快速开始新增长采集示例
+
+## [0.17.1] - 2026-08-17
+
+### Changed
+
+- `matlab/frontend/plutoGnssFrontEnd.m`：step() 流式长采集增加启动瞬态丢弃
+  （`WarmupMs`，默认 10 s）。实测流启动前 ~6 s 存在射频校准/缓冲建立瞬态，
+  捕获指标正常但跟踪无法锁定；丢弃后 35 s 采集可稳定锁定并解出子帧/星历
+
+## [0.17.0] - 2026-08-17
+
+### Changed
+
+- `matlab/frontend/plutoGnssFrontEnd.m`：支持长采集。超过 `capture()` 单次上限
+  （16,777,216 采样）时自动切换 `step()` 连续流采集（`SamplesPerFrame` +
+  `kernelBuffersCount=32`，M1 已验证方案），可用于 30 s+ 完整导航电文采集；
+  新增 `FrameMs` 参数（默认 10 ms）
+
+## [0.16.1] - 2026-08-17
+
+### Changed
+
+- 文档记录 7020-SDR 新板晶振事实：板载 TCXO **±0.5 ppm**（用户确认），
+  L1 频偏约 ±0.8 kHz，本振误差风险对新板基本消除；
+  同步更新 `docs/HANDOFF_20260814.md`、`docs/Calibration_7020SDR.md`、
+  `docs/AD936X_Crystal_Selection.md`
+
 ## [0.16.0] - 2026-08-17
 
 ### Added
