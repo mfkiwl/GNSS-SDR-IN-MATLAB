@@ -34,6 +34,7 @@ p.CorrSpacing  = 0.5;
 p.AcqIntegrationMs = 5;
 p.TxGain       = -65;
 p.TxAmplitude  = 0.1;
+p.RxGain       = 20;
 capSet = false;
 acqSet = false;
 txSet  = false;
@@ -57,6 +58,7 @@ for k = 1:2:numel(varargin)
         case 'acqintegrationms', p.AcqIntegrationMs = val; acqSet = true;
         case 'txgain',       p.TxGain = val; txSet = true;
         case 'txamplitude',  p.TxAmplitude = val;
+        case 'rxgain',       p.RxGain = val;
         otherwise, error('未知参数: %s', key);
     end
 end
@@ -194,7 +196,7 @@ try
         frameSamples = round(p.Fs * 0.01);
         rx = sdrrx('Pluto', 'RadioID', radioID, ...
             'CenterFrequency', 1575.42e6, 'BasebandSampleRate', p.Fs, ...
-            'GainSource', 'Manual', 'Gain', 20, 'OutputDataType', 'double', ...
+            'GainSource', 'Manual', 'Gain', p.RxGain, 'OutputDataType', 'double', ...
             'SamplesPerFrame', frameSamples);
         try, rx.kernelBuffersCount = 32; catch, end
         nFrames = round(nSamp / frameSamples);

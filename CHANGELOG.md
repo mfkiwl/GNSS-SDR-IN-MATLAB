@@ -3,6 +3,38 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.16.0] - 2026-08-17
+
+### Added
+
+- `matlab/acquisition/verifyAntennaBiasT.m`：有源 GPS 天线直连 vs Bias-T 增益测量脚本
+  （Case: Cal / BiasT / Direct / Compare / SpecPlot；1 MHz 步进 × 每点 N 次采集中值；
+  1500~1600 MHz 分段频谱拼接，带泄漏对照）
+- `matlab/acquisition/plotGnssPositioningResult.m`：M4.2 定位结果可视化
+  （捕获指标 / 跟踪 CN0 / ENU 定位误差 / 伪距一致性四面板）
+- `docs/Calibration_7020SDR.md`：新板 7020-SDR 功率标定记录
+  （回环线档位 + 有源天线 LNA 增益测试 + M4.2 多星档位）
+- `docs/Blog_GPS_Receiver_Notes.md`、`docs/AD936X_Crystal_Selection.md`：
+  第五次交接调研文档（GPS 接收机博客研读 / AD936X 晶振选型要点）
+- `docs/HANDOFF_20260814.md`：第五次交接文档（M1→M4 全成果 + 硬件调研）
+
+### Changed
+
+- `matlab/acquisition/verifyGnssPositioning.m`：新增 `RxGain` 参数
+  （硬件模式 RX 增益可配；默认 20 dB 保持旧行为，新板需 40 dB 避免量化受限）
+
+### Key Findings (新板 7020-SDR，2026-08-17)
+
+- 新板与 MATLAB Pluto 支持包完全兼容（`findPlutoRadio` 直接识别，固件 0.38）
+- 回环线标定：CN0 平台区 RX 30~50 dB（45.7 dB-Hz），推荐 RX 40 dB；
+  同档位信号比旧 Pluto 弱约 20~30 dB，功率档位必须按新板重标
+- 有源天线 LNA 有效增益 9.5~18.8 dB（均值 14.7 dB）；精细扫描带内响应
+  峰在 1564~1565 MHz，直连（LNA 断电）电平与泄漏基底同量级
+- **M4.2 硬件多星定位 PASS**：TX −60 dB / RX 40 dB → CN0 45.7 dB-Hz，
+  定位误差 136.4 m / 136.7 m（与旧 Pluto 133 m 一致；断电前后可复现）
+- 工程教训：TX/RX 接反导致首轮测试无效；RX1 口存在 TX1 近场泄漏
+  （拔天线仍有 −29~−33 dBFS），定量测量必须做泄漏对照
+
 ## [0.7.0] - 2026-08-07
 
 ### Changed
