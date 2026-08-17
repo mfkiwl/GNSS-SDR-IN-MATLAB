@@ -68,7 +68,9 @@ plutoGnssFrontEnd('DurationMs', 35000, 'GainMode', 'Manual', 'GainDb', 50)
 GNSS-SDR-IN-MATLAB/
 ├── docs/
 │   ├── project_overview.md           # 项目总览：硬件选购、架构、路线图
-│   └── M1_streaming_verification.md  # M1 连续采集验证方案与结论
+│   ├── M1_streaming_verification.md  # M1 连续采集验证方案与结论
+│   ├── M4_positioning.md             # M4.2 多星定位验证报告（Synthetic + 硬件闭环）
+│   └── M5_real_satellite_reception.md # M5 真实卫星接收：完整导航电文/星历解码
 ├── matlab/
 │   ├── frontend/                     # 射频前端：采集 + M1 验证
 │   │   ├── gnssSettings.m

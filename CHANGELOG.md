@@ -3,6 +3,17 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.18.1] - 2026-08-17
+
+### Added
+
+- `docs/M5_real_satellite_reception.md`：真实卫星接收里程碑独立报告
+  （硬件接线、长采集三连坑、实测数据、复现步骤、下一步计划）
+
+### Changed
+
+- README 仓库结构同步新增 M5 文档
+
 ## [0.18.0] - 2026-08-17
 
 ### Added
