@@ -3,6 +3,15 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.19.0] - 2026-08-18
+
+### Added
+
+- `docs/GUI_realtime_plan.md`：实时 GUI（准实时模式）实施计划
+  （目标里程碑 M6）——`step()` 连续流 + 环形缓冲 + 双 timer
+  （采集/处理分离），每 1 s tick 窗口处理并刷新 C/N0/电文/定位；
+  含架构、里程碑 M6.1~M6.5、关键设计决策、验证方案、风险与复用点
+
 ## [0.18.1] - 2026-08-17
 
 ### Added
